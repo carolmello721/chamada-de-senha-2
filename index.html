@@ -438,7 +438,7 @@
 
 
                 <div class="text-center mt-8 text-caption text-grey">
-                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.1
+                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.2
                 </div>
               </v-card>
             </v-col>
@@ -448,6 +448,7 @@
 
     const TelaRecepcao = {
       setup() {
+        console.log("TelaRecepcao iniciada");
         const busca = ref('');
         const dialogo = ref(false);
         const dialogoValidacao = ref(false);
@@ -621,6 +622,7 @@
 
     const TelaAtendimento = {
       setup() {
+        console.log("TelaAtendimento iniciada");
         const numeroGuiche = ref('03');
         const cabecalhos = [
           { title: 'Prio.', key: 'prioridade', width: '5%' },
@@ -636,7 +638,7 @@
               const pesoA = PRIORIDADES[a.prioridade]?.ordem || 0;
               const pesoB = PRIORIDADES[b.prioridade]?.ordem || 0;
               if (pesoB !== pesoA) return pesoB - pesoA;
-              return a.id - b.id;
+              return a.id.localeCompare(b.id);
             });
         });
 
@@ -749,11 +751,13 @@
 
     const TelaUsuarios = {
       setup() {
+        console.log("TelaUsuarios iniciada");
         const dialogo = ref(false);
         const editando = ref(null);
+        const formValido = ref(false);
         const novoUsuario = reactive({
           nome: '', email: '', cpf: '', senha: '', confirmeSenha: '',
-          funcao: 'atendente', polo: '', assistenteSocial: false
+          funcao: 'atendente', polo: '', ativo: true, assistenteSocial: false
         });
 
         watch(() => novoUsuario.cpf, (v) => {
@@ -892,6 +896,7 @@
     const TelaGestor = {
       components: { TelaRecepcao, TelaAtendimento, TelaUsuarios },
       setup() {
+        console.log("TelaGestor iniciada");
         const aba = ref('painel');
 
         const estatisticas = computed(() => {
