@@ -21,11 +21,34 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.8/dist/vuetify.js"></script>
 
+  <!-- Firebase Compat SDKs (Better for opening file directly) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
   <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyA89djCQKuiC1TZr88Disa2mDG-YiuC1oc",
+      authDomain: "chamada-de-senha.firebaseapp.com",
+      projectId: "chamada-de-senha",
+      storageBucket: "chamada-de-senha.firebasestorage.app",
+      messagingSenderId: "373483775605",
+      appId: "1:373483775605:web:0d69f1bc3bd5c34bb3ba3c",
+      measurementId: "G-Z89VVLQZN5"
+    };
+
+    // Initialize Firebase
+    console.log("Iniciando conexão com Firebase...");
+    let db;
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      console.log("Firebase Firestore inicializado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao inicializar Firebase:", error);
+    }
+
     const { createApp, reactive, ref, computed, watch, onMounted } = Vue;
     const { createVuetify } = Vuetify;
-
-    const canal = new BroadcastChannel('cras_queue_sync');
 
     const PRIORIDADES = {
       'Normal': { ordem: 0, icone: '', cor: 'grey' },
@@ -36,251 +59,178 @@
       'Idoso 80+': { ordem: 20, icone: 'mdi-human-cane', cor: 'deep-orange' },
     };
 
-    const carregarLocalStorage = () => {
-      const dados = localStorage.getItem('cras_queue_data');
-      return dados ? JSON.parse(dados) : null;
-    };
-
-    const salvarLocalStorage = (dados) => {
-      localStorage.setItem('cras_queue_data', JSON.stringify(dados));
-    };
-
-    const dadosPadrao = {
-      cidadaos: [
-        { id: 1, nome: 'Maria Oliveira', cpf: '123.456.789-00', codigoFamiliar: '12345', status: 'Agendado', horarioAgendado: '08:00', prioridade: 'Idoso 60+' },
-        { id: 2, nome: 'João Silva', cpf: '987.654.321-11', codigoFamiliar: '54321', status: 'Finalizado', horarioCheckIn: '08:10', horarioTermino: '08:35', idAtendente: 1, numeroGuiche: '01', prioridade: 'Normal' },
-        { id: 3, nome: 'Ana Souza', cpf: '456.789.012-22', codigoFamiliar: '99999', status: 'Aguardando Atendimento', horarioCheckIn: '08:15', prioridade: 'Gestante' },
-        { id: 4, nome: 'Pedro Santos', cpf: '321.654.987-33', codigoFamiliar: '11223', status: 'Agendado', horarioAgendado: '09:00', prioridade: 'Normal' },
-        { id: 5, nome: 'Carla Lima', cpf: '789.012.345-44', codigoFamiliar: '44556', status: 'Aguardando Atendimento', horarioCheckIn: '08:45', prioridade: 'PCD' },
-        { id: 6, nome: 'Marcos Pereira', cpf: '654.321.098-55', codigoFamiliar: '77889', status: 'Agendado', horarioAgendado: '09:30', prioridade: 'Normal' },
-        { id: 7, nome: 'Fernanda Costa', cpf: '159.357.258-66', codigoFamiliar: '99887', status: 'Finalizado', horarioCheckIn: '09:00', horarioTermino: '09:20', idAtendente: 1, numeroGuiche: '02', prioridade: 'Idoso 80+' },
-        { id: 8, nome: 'Lucas Almeida', cpf: '753.951.456-77', codigoFamiliar: '66554', status: 'Ausente', horarioCheckIn: '09:10', prioridade: 'Normal' },
-        { id: 9, nome: 'Beatriz Rocha', cpf: '852.963.741-88', codigoFamiliar: '33221', status: 'Cancelado', motivoCancelamento: 'Documentação Irregular', horarioCheckIn: '09:20', prioridade: 'Autismo' },
-        { id: 10, nome: 'Gabriel Martins', cpf: '951.753.852-99', codigoFamiliar: '00112', status: 'Agendado', horarioAgendado: '10:00', prioridade: 'Normal' },
-        { id: 11, nome: 'Juliana Ferreira', cpf: '357.159.486-00', codigoFamiliar: '22334', status: 'Aguardando Atendimento', horarioCheckIn: '09:50', prioridade: 'Normal' },
-        { id: 12, nome: 'Rafael Mendes', cpf: '258.456.357-11', codigoFamiliar: '55667', status: 'Encaixe', horarioCheckIn: '09:55', prioridade: 'Normal' },
-        { id: 13, nome: 'Patrícia Gomes', cpf: '147.258.369-22', codigoFamiliar: '88990', status: 'Agendado', horarioAgendado: '10:30', prioridade: 'Gestante' },
-        { id: 14, nome: 'Rodrigo Barbosa', cpf: '369.258.147-33', codigoFamiliar: '12121', status: 'Agendado', horarioAgendado: '11:00', prioridade: 'Idoso 60+' },
-        { id: 15, nome: 'Sofia Alves', cpf: '741.852.963-44', codigoFamiliar: '34343', status: 'Agendado', horarioAgendado: '11:30', prioridade: 'PCD' }
-      ],
-      filaTV: [
-        { id: 7, nome: 'Fernanda Costa', numeroGuiche: '02', horarioChamada: '09:05', prioridade: 'Idoso 80+' },
-        { id: 2, nome: 'João Silva', numeroGuiche: '01', horarioChamada: '08:15', prioridade: 'Normal' }
-      ],
-      usuarios: [
-        { id: 1, nome: 'Operador Admin', email: 'admin@cras.gov.br', senha: '123', cpf: '000.000.000-00', funcao: 'gerente', polo: 'Central', ativo: true, assistenteSocial: false },
-        { id: 2, nome: 'Atendente 01', email: 'atendente1@cras.gov.br', senha: '123', cpf: '111.111.111-11', funcao: 'atendente', polo: 'Polo Norte', ativo: true, assistenteSocial: true }
-      ]
-    };
-
-    const carregarDados = () => {
-      const persistidos = carregarLocalStorage();
-      if (!persistidos) return dadosPadrao;
-
-      return {
-        cidadaos: persistidos.cidadaos || dadosPadrao.cidadaos,
-        filaTV: persistidos.filaTV || dadosPadrao.filaTV,
-        usuarios: persistidos.usuarios || dadosPadrao.usuarios
-      };
-    };
-
-    const dadosIniciais = carregarDados();
-
     const estado = reactive({
       usuarioAtual: null,
       vistaAtiva: null,
       moduloAtual: 'sistema',
       snackbar: { mostrar: false, texto: '', cor: 'success' },
-      cidadaos: dadosIniciais.cidadaos,
-      filaTV: dadosIniciais.filaTV,
-      usuarios: dadosIniciais.usuarios,
+      cidadaos: [],
+      filaTV: [],
+      usuarios: [],
       chamadaAtual: null,
       clima: { temperatura: '--', condicao: 'Carregando...', icone: 'mdi-cloud-outline' }
     });
 
-    canal.onmessage = (evento) => {
-      const { tipo, dados } = evento.data;
-      if (tipo === 'ATUALIZACAO_ESTADO') {
-        Object.keys(dados).forEach(chave => {
-          if (chave !== 'usuarioAtual' && chave !== 'vistaAtiva') {
-            estado[chave] = dados[chave];
-          }
-        });
-        salvarLocalStorage({
-          cidadaos: JSON.parse(JSON.stringify(estado.cidadaos)),
-          filaTV: JSON.parse(JSON.stringify(estado.filaTV)),
-          usuarios: JSON.parse(JSON.stringify(estado.usuarios))
-        });
+    // Listeners em tempo real do Firestore
+    db.collection("cidadaos").onSnapshot((snapshot) => {
+      estado.cidadaos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+
+    db.collection("usuarios").onSnapshot((snapshot) => {
+      estado.usuarios = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+
+    db.collection("configuracao").doc("geral").onSnapshot((doc) => {
+      if (doc.exists) {
+        const data = doc.data();
+        estado.filaTV = data.filaTV || [];
+        estado.chamadaAtual = data.chamadaAtual || null;
       }
-    };
+    });
 
-    const transmitirEstado = () => {
-      const dadosParaSincronizar = {
-        cidadaos: JSON.parse(JSON.stringify(estado.cidadaos)),
-        chamadaAtual: JSON.parse(JSON.stringify(estado.chamadaAtual)),
+    const persistirConfiguracao = async () => {
+      await db.collection("configuracao").doc("geral").set({
         filaTV: JSON.parse(JSON.stringify(estado.filaTV)),
-        clima: JSON.parse(JSON.stringify(estado.clima)),
-        usuarios: JSON.parse(JSON.stringify(estado.usuarios)),
-        snackbar: JSON.parse(JSON.stringify(estado.snackbar))
-      };
-
-      salvarLocalStorage({
-        cidadaos: dadosParaSincronizar.cidadaos,
-        filaTV: dadosParaSincronizar.filaTV,
-        usuarios: dadosParaSincronizar.usuarios
-      });
-
-      canal.postMessage({
-        tipo: 'ATUALIZACAO_ESTADO',
-        dados: dadosParaSincronizar
+        chamadaAtual: JSON.parse(JSON.stringify(estado.chamadaAtual))
       });
     };
 
     const acoes = {
       definirUsuarioAtual(usuario) { estado.usuarioAtual = usuario; },
-
-      notificar(texto, cor = 'info') {
-        estado.snackbar = { mostrar: true, texto, cor };
-        setTimeout(() => { if (estado.snackbar.mostrar) estado.snackbar.mostrar = false; transmitirEstado(); }, 3000);
-        transmitirEstado();
+      notificar(texto, cor = 'success') {
+        estado.snackbar.texto = texto;
+        estado.snackbar.cor = cor;
+        estado.snackbar.mostrar = true;
       },
-
-      adicionarUsuario(usuario) {
-        const novo = {
-          ...usuario,
-          id: Date.now(),
-          ativo: true
-        };
-        estado.usuarios.push(novo);
-        acoes.notificar(`Usuário ${novo.nome} cadastrado com sucesso!`, 'success');
-        transmitirEstado();
+      mudarVista(vista) {
+        estado.vistaAtiva = vista;
       },
-
-      removerUsuario(id) {
-        const index = estado.usuarios.findIndex(u => u.id === id);
-        if (index !== -1) {
-          const nome = estado.usuarios[index].nome;
-          estado.usuarios.splice(index, 1);
-          acoes.notificar(`Usuário ${nome} removido.`, 'warning');
-          transmitirEstado();
-        }
+      sair() {
+        estado.usuarioAtual = null;
+        estado.vistaAtiva = 'login';
       },
-
       login(email, senha) {
-        const emailLimpo = email.trim().toLowerCase();
-        const senhaLimpa = senha.trim();
-
-        const usuario = estado.usuarios.find(u =>
-          u.email.toLowerCase() === emailLimpo &&
-          u.senha === senhaLimpa &&
-          u.ativo
-        );
-
+        const emailNormal = email.trim().toLowerCase();
+        const usuario = estado.usuarios.find(u => u.email.toLowerCase() === emailNormal && u.senha === senha && u.ativo);
         if (usuario) {
           estado.usuarioAtual = usuario;
           estado.vistaAtiva = usuario.funcao;
           acoes.notificar(`Bem-vindo, ${usuario.nome}!`, 'success');
-          transmitirEstado();
         } else {
-          acoes.notificar('Usuário ou senha inválidos, ou conta inativa.', 'error');
+          acoes.notificar('Credenciais inválidas ou usuário inativo.', 'error');
         }
       },
 
-
-      sair() {
-        estado.usuarioAtual = null;
-        estado.vistaAtiva = null;
-        acoes.notificar('Sessão encerrada.', 'info');
-      },
-
-      mudarVista(vista) {
-        estado.vistaAtiva = vista;
-        transmitirEstado();
-      },
-
-      realizarCheckIn(idCidadao) {
-        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
-        if (cidadao) {
-          cidadao.status = 'Aguardando Atendimento';
-          cidadao.horarioCheckIn = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          acoes.notificar(`Check-in de ${cidadao.nome} realizado com sucesso!`, 'success');
-          transmitirEstado();
-        }
-      },
-      adicionarEncaixe(nome, cpf, prioridade = 'Normal') {
-        estado.cidadaos.push({
-          id: Date.now(), nome, cpf, status: 'Aguardando Atendimento', prioridade,
+      async realizarCheckIn(idCidadao) {
+        await db.collection("cidadaos").doc(idCidadao).update({
+          status: 'Aguardando Atendimento',
           horarioCheckIn: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
         });
-        acoes.notificar(`Encaixe de ${nome} (${prioridade}) adicionado!`, 'success');
-        transmitirEstado();
+        acoes.notificar(`Check-in realizado com sucesso!`, 'success');
       },
-      chamarCidadao(idCidadao, idAtendente, numeroGuiche) {
+
+      async adicionarEncaixe(nome, cpf, prioridade = 'Normal') {
+        await db.collection("cidadaos").add({
+          nome, cpf, status: 'Aguardando Atendimento', prioridade,
+          horarioCheckIn: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          criadoEm: new Date().toISOString()
+        });
+        acoes.notificar(`Encaixe de ${nome} adicionado!`, 'success');
+      },
+
+      async chamarCidadao(idCidadao, idAtendente, numeroGuiche) {
         const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
         if (cidadao) {
           if (cidadao.status === 'Em Chamada' && cidadao.idAtendente !== idAtendente) {
             acoes.notificar('Este cidadão já está sendo chamado em outro guichê!', 'error');
             return;
           }
-          cidadao.status = 'Em Chamada';
-          cidadao.horarioChamada = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          cidadao.idAtendente = idAtendente;
-          cidadao.numeroGuiche = numeroGuiche;
-          estado.chamadaAtual = { ...cidadao };
+
+          const updates = {
+            status: 'Em Chamada',
+            horarioChamada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            idAtendente,
+            numeroGuiche
+          };
+          await db.collection("cidadaos").doc(idCidadao).update(updates);
+
+          estado.chamadaAtual = { ...cidadao, ...updates };
+          await persistirConfiguracao();
           acoes.notificar(`Chamando ${cidadao.nome} para guichê ${numeroGuiche}...`, 'primary');
-          transmitirEstado();
-        }
-      },
-      iniciarAtendimento(idCidadao) {
-        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
-        if (cidadao) {
-          cidadao.status = 'Em Atendimento';
-          cidadao.horarioInicioAtendimento = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          acoes.notificar(`Iniciando atendimento de ${cidadao.nome}.`, 'info');
-          transmitirEstado();
-        }
-      },
-      finalizarAtendimento(idCidadao) {
-        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
-        if (cidadao) {
-          cidadao.status = 'Finalizado';
-          cidadao.horarioTermino = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) {
-            estado.filaTV.unshift({ ...estado.chamadaAtual });
-            if (estado.filaTV.length > 5) estado.filaTV.pop();
-            estado.chamadaAtual = null;
-          }
-          acoes.notificar(`Atendimento de ${cidadao.nome} finalizado.`, 'success');
-          transmitirEstado();
-        }
-      },
-      marcarAusente(idCidadao) {
-        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
-        if (cidadao) {
-          cidadao.status = 'Ausente';
-          if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) estado.chamadaAtual = null;
-          acoes.notificar(`${cidadao.nome} marcado como ausente.`, 'warning');
-          transmitirEstado();
-        }
-      },
-      cancelarAtendimento(idCidadao, motivo) {
-        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
-        if (cidadao) {
-          cidadao.status = 'Cancelado';
-          cidadao.motivoCancelamento = motivo;
-          if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) estado.chamadaAtual = null;
-          acoes.notificar(`Atendimento cancelado: ${motivo}`, 'error');
-          transmitirEstado();
         }
       },
 
-      zerarSistema() {
+      async iniciarAtendimento(idCidadao) {
+        await db.collection("cidadaos").doc(idCidadao).update({
+          status: 'Em Atendimento',
+          horarioInicioAtendimento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        });
+        acoes.notificar(`Atendimento iniciado.`, 'info');
+      },
+
+      async finalizarAtendimento(idCidadao) {
+        const horarioTermino = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        await db.collection("cidadaos").doc(idCidadao).update({
+          status: 'Finalizado',
+          horarioTermino
+        });
+
+        if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) {
+          const finalizado = { ...estado.chamadaAtual, status: 'Finalizado', horarioTermino };
+          estado.filaTV.unshift(finalizado);
+          if (estado.filaTV.length > 5) estado.filaTV.pop();
+          estado.chamadaAtual = null;
+          await persistirConfiguracao();
+        }
+        acoes.notificar(`Atendimento finalizado.`, 'success');
+      },
+
+      async marcarAusente(idCidadao) {
+        await db.collection("cidadaos").doc(idCidadao).update({ status: 'Ausente' });
+
+        if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) {
+          estado.chamadaAtual = null;
+          await persistirConfiguracao();
+        }
+        acoes.notificar(`Cidadão marcado como ausente.`, 'warning');
+      },
+
+      async cancelarAtendimento(idCidadao, motivo) {
+        await db.collection("cidadaos").doc(idCidadao).update({ status: 'Cancelado', motivoCancelamento: motivo });
+
+        if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) {
+          estado.chamadaAtual = null;
+          await persistirConfiguracao();
+        }
+        acoes.notificar(`Atendimento cancelado: ${motivo}`, 'error');
+      },
+
+      async adicionarUsuario(dados) {
+        await db.collection("usuarios").add({
+          ...dados,
+          ativo: true,
+          criadoEm: new Date().toISOString()
+        });
+        acoes.notificar('Usuário criado com sucesso!', 'success');
+      },
+
+      async removerUsuario(id) {
+        await db.collection("usuarios").doc(id).delete();
+        acoes.notificar('Usuário removido.', 'success');
+      },
+
+      async zerarSistema() {
         if (confirm('ATENÇÃO: Isso apagará TODOS os dados do dia. Deseja continuar?')) {
-          estado.cidadaos = [];
+          const snapshot = await db.collection("cidadaos").get();
+          const batch = db.batch();
+          snapshot.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+
           estado.filaTV = [];
           estado.chamadaAtual = null;
+          await persistirConfiguracao();
+
           acoes.notificar('Sistema reiniciado com sucesso!', 'error');
-          transmitirEstado();
         }
       },
 
@@ -300,19 +250,82 @@
           else if (codigo >= 80 && codigo <= 99) { icone = 'mdi-weather-pouring'; condicao = 'Tempestade'; }
 
           estado.clima = { temperatura, condicao, icone };
-          transmitirEstado();
         } catch (e) {
           console.error('Falha ao buscar clima', e);
         }
+      },
+
+      async semearDados() {
+        console.log("Iniciando verificação de dados (Seed)...");
+        try {
+          // Verifica se já existem usuários
+          const usuariosSnap = await db.collection("usuarios").get();
+          console.log("Usuários encontrados:", usuariosSnap.size);
+          if (usuariosSnap.empty) {
+            console.log("Semeando usuários iniciais...");
+            const usuariosPadrao = [
+              { nome: 'Operador Admin', email: 'admin@cras.gov.br', senha: '123', cpf: '000.000.000-00', funcao: 'gerente', polo: 'Central', ativo: true, assistenteSocial: false },
+              { nome: 'Atendente 01', email: 'atendente1@cras.gov.br', senha: '123', cpf: '111.111.111-11', funcao: 'atendente', polo: 'Polo Norte', ativo: true, assistenteSocial: true }
+            ];
+            for (const u of usuariosPadrao) {
+              await db.collection("usuarios").add(u);
+            }
+            console.log("Usuários semeados com sucesso!");
+          }
+
+          const cidadaosSnap = await db.collection("cidadaos").get();
+          console.log("Cidadãos encontrados:", cidadaosSnap.size);
+          if (cidadaosSnap.empty) {
+            console.log("Semeando cidadãos iniciais...");
+            const cidadaosPadrao = [
+              { nome: 'Maria Oliveira', cpf: '123.456.789-00', codigoFamiliar: '12345', status: 'Agendado', horarioAgendado: '08:00', prioridade: 'Idoso 60+' },
+              { nome: 'João Silva', cpf: '987.654.321-11', codigoFamiliar: '54321', status: 'Finalizado', horarioCheckIn: '08:10', horarioTermino: '08:35', idAtendente: 1, numeroGuiche: '01', prioridade: 'Normal' },
+              { nome: 'Ana Souza', cpf: '456.789.012-22', codigoFamiliar: '99999', status: 'Aguardando Atendimento', horarioCheckIn: '08:15', prioridade: 'Gestante' }
+            ];
+            for (const c of cidadaosPadrao) {
+              await db.collection("cidadaos").add(c);
+            }
+            console.log("Cidadãos semeados com sucesso!");
+          }
+        } catch (error) {
+          console.error("Erro durante o Seed de dados:", error);
+          acoes.notificar("Erro de conexão com o banco de dados. Verifique as Regras do Firestore.", "error");
+        }
       }
+    };
+
+    const regrasYaml = {
+      obrigatorio: v => !!v || 'Campo obrigatório',
+      email: v => (!v || /.+@.+\..+/.test(v)) || 'E-mail inválido',
+      cpf: v => (!v || v.length === 14) || 'CPF deve ter 11 dígitos',
+      senhaCurta: v => (!v || v.length >= 3) || 'Mínimo de 3 caracteres',
+      confirmarSenha: (senha) => (v => v === senha || 'As senhas não coincidem')
+    };
+
+    const aplicarMascaraCPF = (valor) => {
+      if (!valor) return '';
+      let v = valor.replace(/\D/g, '');
+      if (v.length > 11) v = v.slice(0, 11);
+      return v
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    };
+
+    const formatarCPF = (cpf) => {
+      if (!cpf) return '';
+      const digitos = cpf.replace(/\D/g, '');
+      return digitos.length === 11 ? `***.${digitos.substring(3, 6)}.${digitos.substring(6, 9)}-**` : cpf;
     };
 
     const TelaLogin = {
       setup() {
         const credenciais = reactive({ email: '', senha: '' });
         const carregando = ref(false);
+        const valido = ref(false);
 
         const entrar = async () => {
+          if (!valido.value) return;
           carregando.value = true;
           setTimeout(() => {
             acoes.login(credenciais.email, credenciais.senha);
@@ -320,7 +333,7 @@
           }, 800);
         };
 
-        return { credenciais, entrar, carregando };
+        return { credenciais, entrar, carregando, valido, regras: regrasYaml };
       },
       template: `
         <v-container fluid class="fill-height bg-grey-lighten-4">
@@ -333,10 +346,11 @@
                   <p class="text-subtitle-1 text-grey">Gestão de Filas CRAS IAUPE</p>
                 </div>
 
-                <v-form @submit.prevent="entrar">
+                <v-form v-model="valido" @submit.prevent="entrar">
                   <v-text-field
                     label="E-mail"
                     v-model="credenciais.email"
+                    :rules="[regras.obrigatorio, regras.email]"
                     prepend-inner-icon="mdi-email-outline"
                     variant="outlined"
                     color="primary"
@@ -347,6 +361,7 @@
                   <v-text-field
                     label="Senha"
                     v-model="credenciais.senha"
+                    :rules="[regras.obrigatorio, regras.senhaCurta]"
                     prepend-inner-icon="mdi-lock-outline"
                     variant="outlined"
                     color="primary"
@@ -362,16 +377,17 @@
                     rounded="lg"
                     type="submit"
                     :loading="carregando"
+                    :disabled="!valido"
                     elevation="6"
                   >
                     Entrar
                   </v-btn>
                 </v-form>
 
+
                 <div class="text-center mt-8 text-caption text-grey">
                   &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.0
                 </div>
-
                 <v-divider class="my-4"></v-divider>
                 <div class="text-center">
                   <v-btn variant="text" size="x-small" color="grey" @click="localStorage.clear(); location.reload();">
@@ -379,10 +395,10 @@
                     Limpar Dados Locais (Reset)
                   </v-btn>
                 </div>
-
-              </v-col>
-            </v-row>
-          </v-container>`
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-container>`
     };
 
     const TelaRecepcao = {
@@ -393,31 +409,20 @@
         const cidadaoParaValidar = ref(null);
         const entradaIdentidade = ref('');
         const erroValidacao = ref(false);
+        const formValido = ref(false);
         const novoCidadao = reactive({ nome: '', cpf: '', prioridade: 'Normal' });
         const opcoesPrioridade = Object.keys(PRIORIDADES);
 
-        const cabecalhos = [
-          { title: 'Prioridade', key: 'prioridade', width: '10%' },
-          { title: 'Nome', key: 'nome', align: 'start' },
-          { title: 'CPF', key: 'cpf' },
-          { title: 'Horário', key: 'horarioAgendado' },
-          { title: 'Status', key: 'status' },
-          { title: 'Ações', key: 'acoes', sortable: false },
-        ];
+        watch(() => novoCidadao.cpf, (v) => {
+          novoCidadao.cpf = aplicarMascaraCPF(v);
+        });
 
-        const agendamentosHoje = computed(() => estado.cidadaos.filter(c => c.status === 'Agendado' || (c.status === 'Aguardando Atendimento' && c.horarioAgendado)));
-
-        const formatarCPF = (cpf) => {
-          if (!cpf) return '';
-          const digitos = cpf.replace(/\D/g, '');
-          return digitos.length === 11 ? `***.${digitos.substring(3, 6)}.${digitos.substring(6, 9)}-**` : cpf;
-        };
-
-        const obterIconePrioridade = (p) => PRIORIDADES[p]?.icone || '';
-        const obterCorPrioridade = (p) => PRIORIDADES[p]?.cor || 'grey';
+        watch(() => entradaIdentidade.value, (v) => {
+          entradaIdentidade.value = aplicarMascaraCPF(v);
+        });
 
         const salvarEncaixe = () => {
-          if (novoCidadao.nome && novoCidadao.cpf) {
+          if (formValido.value) {
             acoes.adicionarEncaixe(novoCidadao.nome, novoCidadao.cpf, novoCidadao.prioridade);
             novoCidadao.nome = ''; novoCidadao.cpf = ''; novoCidadao.prioridade = 'Normal'; dialogo.value = false;
           }
@@ -448,6 +453,20 @@
           }
         };
 
+        const agendamentosHoje = computed(() => estado.cidadaos.filter(c => c.status === 'Agendado' || (c.status === 'Aguardando Atendimento' && c.horarioAgendado)));
+
+        const cabecalhos = [
+          { title: 'Prioridade', key: 'prioridade', width: '10%' },
+          { title: 'Nome', key: 'nome', align: 'start' },
+          { title: 'CPF', key: 'cpf' },
+          { title: 'Horário', key: 'horarioAgendado' },
+          { title: 'Status', key: 'status' },
+          { title: 'Ações', key: 'acoes', sortable: false },
+        ];
+
+        const obterIconePrioridade = (p) => PRIORIDADES[p]?.icone || '';
+        const obterCorPrioridade = (p) => PRIORIDADES[p]?.cor || 'grey';
+
         return {
           estado, acoes, busca, cabecalhos, agendamentosHoje, formatarCPF, dialogo, novoCidadao, salvarEncaixe,
           dialogoValidacao,
@@ -456,7 +475,8 @@
           abrirModalValidacao,
           confirmarIdentidade,
           erroValidacao,
-          opcoesPrioridade, obterIconePrioridade, obterCorPrioridade
+          opcoesPrioridade, obterIconePrioridade, obterCorPrioridade,
+          regras: regrasYaml, formValido
         };
       },
       template: `
@@ -503,16 +523,18 @@
           <v-dialog v-model="dialogo" max-width="500">
             <v-card rounded="xl" class="pa-6" elevation="10" style="backdrop-filter: blur(20px); background: rgba(255,255,255,0.95);">
               <v-card-title class="text-h5 font-weight-bold text-primary mb-4">Adicionar Encaixe</v-card-title>
-              <v-card-text class="pa-0">
-                <v-text-field label="Nome Completo" v-model="novoCidadao.nome" variant="outlined" color="primary" class="mb-2" rounded="lg"></v-text-field>
-                <v-text-field label="CPF" v-model="novoCidadao.cpf" variant="outlined" color="primary" class="mb-2" rounded="lg"></v-text-field>
-                <v-select label="Prioridade (Lei)" v-model="novoCidadao.prioridade" :items="opcoesPrioridade" variant="outlined" color="primary" rounded="lg" prepend-inner-icon="mdi-human-queue"></v-select>
-              </v-card-text>
-              <v-card-actions class="mt-4 pa-0">
-                <v-spacer></v-spacer>
-                <v-btn variant="text" rounded="lg" @click="dialogo = false" size="large">Cancelar</v-btn>
-                <v-btn color="primary" variant="flat" rounded="lg" size="large" @click="salvarEncaixe" class="px-6">Confirmar</v-btn>
-              </v-card-actions>
+              <v-form v-model="formValido">
+                <v-card-text class="pa-0">
+                  <v-text-field label="Nome Completo *" v-model="novoCidadao.nome" :rules="[regras.obrigatorio]" variant="outlined" color="primary" class="mb-2" rounded="lg"></v-text-field>
+                  <v-text-field label="CPF *" v-model="novoCidadao.cpf" :rules="[regras.obrigatorio, regras.cpf]" placeholder="000.000.000-00" variant="outlined" color="primary" class="mb-2" rounded="lg"></v-text-field>
+                  <v-select label="Prioridade (Lei)" v-model="novoCidadao.prioridade" :items="opcoesPrioridade" variant="outlined" color="primary" rounded="lg" prepend-inner-icon="mdi-human-queue"></v-select>
+                </v-card-text>
+                <v-card-actions class="mt-4 pa-0">
+                  <v-spacer></v-spacer>
+                  <v-btn variant="text" rounded="lg" @click="dialogo = false" size="large">Cancelar</v-btn>
+                  <v-btn color="primary" variant="flat" rounded="lg" size="large" @click="salvarEncaixe" :disabled="!formValido" class="px-6">Confirmar</v-btn>
+                </v-card-actions>
+              </v-form>
             </v-card>
           </v-dialog>
 
@@ -549,6 +571,7 @@
             </v-card>
           </v-dialog>
         </v-row>`
+
     };
 
     const TelaAtendimento = {
@@ -682,9 +705,14 @@
     const TelaUsuarios = {
       setup() {
         const dialogo = ref(false);
+        const formValido = ref(false);
         const novoUsuario = reactive({
           nome: '', email: '', cpf: '', senha: '', confirmeSenha: '',
           funcao: 'atendente', polo: '', assistenteSocial: false
+        });
+
+        watch(() => novoUsuario.cpf, (v) => {
+          novoUsuario.cpf = aplicarMascaraCPF(v);
         });
 
         const polos = ['Central', 'Polo Norte', 'Polo Sul', 'Polo Leste', 'Polo Oeste'];
@@ -705,16 +733,16 @@
         ];
 
         const salvar = () => {
-          if (novoUsuario.senha !== novoUsuario.confirmeSenha) {
+          if (formValido.value) {
+            acoes.adicionarUsuario({ ...novoUsuario });
+            dialogo.value = false;
+            Object.assign(novoUsuario, { nome: '', email: '', cpf: '', senha: '', confirmeSenha: '', funcao: 'atendente', polo: '', assistenteSocial: false });
+          } else if (novoUsuario.senha !== novoUsuario.confirmeSenha) {
             acoes.notificar('As senhas não conferem!', 'error');
-            return;
           }
-          acoes.adicionarUsuario({ ...novoUsuario });
-          dialogo.value = false;
-          Object.assign(novoUsuario, { nome: '', email: '', cpf: '', senha: '', confirmeSenha: '', funcao: 'atendente', polo: '', assistenteSocial: false });
         };
 
-        return { estado, acoes, dialogo, novoUsuario, polos, gruposAcesso, cabecalhos, salvar };
+        return { estado, acoes, dialogo, novoUsuario, polos, gruposAcesso, cabecalhos, salvar, regras: regrasYaml, formValido };
       },
       template: `
         <v-row>
@@ -731,7 +759,7 @@
             </v-card>
 
             <v-card class="glass-card pa-4" elevation="0">
-              <v-data-table :headers="cabecalhos" :items="estado.usuarios" class="bg-transparent" hover>
+              <v-data-table :headers="cabecalhos" :items="estado.usuarios" class="bg-transparent" hover items-per-page-text="Itens por página">
                 <template v-slot:item.funcao="{ item }">
                   <v-chip size="small" :color="item.funcao === 'gerente' ? 'purple' : 'blue'" variant="tonal" class="font-weight-bold text-uppercase">
                     {{ item.funcao }}
@@ -752,43 +780,46 @@
           <v-dialog v-model="dialogo" max-width="600">
             <v-card rounded="xl" class="pa-6" elevation="10">
               <v-card-title class="text-h5 font-weight-bold text-primary mb-4">Novo Usuário</v-card-title>
-              <v-card-text class="pa-0">
-                <v-switch v-model="novoUsuario.assistenteSocial" label="Este usuário é assistente social?" color="primary" density="compact" class="mb-2"></v-switch>
-                
-                <v-select label="Polo *" v-model="novoUsuario.polo" :items="polos" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-select>
-                
-                <v-text-field label="Nome Completo *" v-model="novoUsuario.nome" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
-                
-                <v-text-field label="E-mail *" v-model="novoUsuario.email" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
-                
-                <v-row>
-                   <v-col cols="12" sm="6">
-                      <v-text-field label="Senha *" v-model="novoUsuario.senha" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
-                   </v-col>
-                   <v-col cols="12" sm="6">
-                      <v-text-field label="Confirme sua senha *" v-model="novoUsuario.confirmeSenha" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
-                   </v-col>
-                </v-row>
+              <v-form v-model="formValido">
+                <v-card-text class="pa-0">
+                  <v-switch v-model="novoUsuario.assistenteSocial" label="Este usuário é assistente social?" color="primary" density="compact" class="mb-2"></v-switch>
+                  
+                  <v-select label="Polo *" v-model="novoUsuario.polo" :items="polos" :rules="[regras.obrigatorio]" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-select>
+                  
+                  <v-text-field label="Nome Completo *" v-model="novoUsuario.nome" :rules="[regras.obrigatorio]" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
+                  
+                  <v-text-field label="E-mail *" v-model="novoUsuario.email" :rules="[regras.obrigatorio, regras.email]" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
+                  
+                  <v-row>
+                    <v-col cols="12" sm="6">
+                        <v-text-field label="Senha *" v-model="novoUsuario.senha" :rules="[regras.obrigatorio, regras.senhaCurta]" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
+                    </v-col>
+                    <v-col cols="12" sm="6">
+                        <v-text-field label="Confirme sua senha *" v-model="novoUsuario.confirmeSenha" :rules="[regras.obrigatorio, regras.confirmarSenha(novoUsuario.senha)]" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
+                    </v-col>
+                  </v-row>
 
-                <v-row class="mt-n4">
-                   <v-col cols="12" sm="6">
-                      <v-text-field label="CPF *" v-model="novoUsuario.cpf" variant="outlined" color="primary" rounded="lg"></v-text-field>
-                   </v-col>
-                   <v-col cols="12" sm="6">
-                      <v-select label="Grupo de Acesso *" v-model="novoUsuario.funcao" :items="gruposAcesso" variant="outlined" color="primary" rounded="lg"></v-select>
-                   </v-col>
-                </v-row>
+                  <v-row class="mt-n4">
+                    <v-col cols="12" sm="6">
+                        <v-text-field label="CPF *" v-model="novoUsuario.cpf" :rules="[regras.obrigatorio, regras.cpf]" placeholder="000.000.000-00" variant="outlined" color="primary" rounded="lg"></v-text-field>
+                    </v-col>
+                    <v-col cols="12" sm="6">
+                        <v-select label="Grupo de Acesso *" v-model="novoUsuario.funcao" :items="gruposAcesso" :rules="[regras.obrigatorio]" variant="outlined" color="primary" rounded="lg"></v-select>
+                    </v-col>
+                  </v-row>
 
-                <v-switch v-model="novoUsuario.ativo" label="Ativo" color="success" density="compact" readonly :model-value="true"></v-switch>
-              </v-card-text>
-              <v-card-actions class="mt-4 pa-0">
-                <v-btn variant="text" rounded="lg" @click="dialogo = false" size="large">Fechar</v-btn>
-                <v-spacer></v-spacer>
-                <v-btn color="primary" variant="flat" rounded="lg" size="large" @click="salvar" class="px-8">Salvar</v-btn>
-              </v-card-actions>
+                  <v-switch v-model="novoUsuario.ativo" label="Ativo" color="success" density="compact" readonly :model-value="true"></v-switch>
+                </v-card-text>
+                <v-card-actions class="mt-4 pa-0">
+                  <v-btn variant="text" rounded="lg" @click="dialogo = false" size="large">Fechar</v-btn>
+                  <v-spacer></v-spacer>
+                  <v-btn color="primary" variant="flat" rounded="lg" size="large" @click="salvar" :disabled="!formValido" class="px-8">Salvar</v-btn>
+                </v-card-actions>
+              </v-form>
             </v-card>
           </v-dialog>
         </v-row>`
+
     };
 
     const TelaGestor = {
@@ -1166,6 +1197,7 @@
           if (urlParams.get('view') === 'tv') {
             estado.moduloAtual = 'tv';
           }
+          acoes.semearDados();
         });
 
         return { componenteAtual, estado };
