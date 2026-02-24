@@ -70,7 +70,8 @@
       filaTV: [],
       usuarios: [],
       chamadaAtual: null,
-      clima: { temperatura: '--', condicao: 'Carregando...', icone: 'mdi-cloud-outline' }
+      clima: { temperatura: '--', condicao: 'Carregando...', icone: 'mdi-cloud-outline' },
+      carregandoInicial: true
     });
 
     // Listeners em tempo real do Firestore
@@ -454,7 +455,7 @@
 
 
                 <div class="text-center mt-8 text-caption text-grey">
-                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.3
+                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.4
                 </div>
               </v-card>
             </v-col>
@@ -1292,19 +1293,25 @@
 
           // Mantém a sessão ativa após F5
           auth.onAuthStateChanged(async (user) => {
-            if (user) {
-              const emailLogin = user.email.toLowerCase();
-              const snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
+            try {
+              if (user) {
+                const emailLogin = user.email.toLowerCase();
+                const snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
 
-              if (!snapshot.empty) {
-                const doc = snapshot.docs[0];
-                estado.usuarioAtual = { id: doc.id, ...doc.data() };
-                // Apenas muda a vista se não estiver no modo TV
-                if (estado.moduloAtual !== 'tv') {
-                  estado.vistaAtiva = estado.usuarioAtual.funcao;
+                if (!snapshot.empty) {
+                  const doc = snapshot.docs[0];
+                  estado.usuarioAtual = { id: doc.id, ...doc.data() };
+                  // Apenas muda a vista se não estiver no modo TV
+                  if (estado.moduloAtual !== 'tv') {
+                    estado.vistaAtiva = estado.usuarioAtual.funcao;
+                  }
+                  console.log("Sessão restaurada para:", user.email);
                 }
-                console.log("Sessão restaurada para:", user.email);
               }
+            } catch (error) {
+              console.error("Erro na restauração de sessão:", error);
+            } finally {
+              estado.carregandoInicial = false;
             }
           });
         });
@@ -1313,11 +1320,20 @@
       },
       template: `
         <v-app>
-          <!-- Gerenciador de visibilidade de componentes principal -->
-          <component v-if="estado.moduloAtual === 'tv' || !estado.usuarioAtual" :is="componenteAtual"></component>
-          <app-layout v-else>
-            <component :is="componenteAtual"></component>
-          </app-layout>
+          <!-- Tela de Carregamento Inicial (F5) -->
+          <div v-if="estado.carregandoInicial" class="fill-height d-flex flex-column align-center justify-center bg-grey-lighten-4" style="height: 100vh;">
+            <v-progress-circular indeterminate color="primary" size="64" width="6" class="mb-4"></v-progress-circular>
+            <div class="text-h6 font-weight-bold text-primary">Carregando Sistema...</div>
+            <div class="text-caption text-grey">CRAS IAUPE &bull; Premium</div>
+          </div>
+          
+          <template v-else>
+            <!-- Gerenciador de visibilidade de componentes principal -->
+            <component v-if="estado.moduloAtual === 'tv' || !estado.usuarioAtual" :is="componenteAtual"></component>
+            <app-layout v-else>
+              <component :is="componenteAtual"></component>
+            </app-layout>
+          </template>
         </v-app>`
     });
 
