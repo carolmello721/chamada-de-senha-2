@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+  <title>Gestão de Filas CRAS IAUPE - Premium</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@3.5.8/dist/vuetify.min.css" rel="stylesheet">
+  <link href="style.css" rel="stylesheet">
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.8/dist/vuetify.js"></script>
+
+  <script>
+    const { createApp, reactive, ref, computed, watch, onMounted } = Vue;
+    const { createVuetify } = Vuetify;
+
+    const canal = new BroadcastChannel('cras_queue_sync');
+
+    const PRIORIDADES = {
+      'Normal': { ordem: 0, icone: '', cor: 'grey' },
+      'Idoso 60+': { ordem: 10, icone: 'mdi-human-cane', cor: 'blue' },
+      'Gestante': { ordem: 10, icone: 'mdi-human-pregnant', cor: 'pink' },
+      'PCD': { ordem: 10, icone: 'mdi-wheelchair-accessibility', cor: 'purple' },
+      'Autismo': { ordem: 10, icone: 'mdi-puzzle', cor: 'indigo' },
+      'Idoso 80+': { ordem: 20, icone: 'mdi-human-cane', cor: 'deep-orange' },
+    };
+
+    const carregarLocalStorage = () => {
+      const dados = localStorage.getItem('cras_queue_data');
+      return dados ? JSON.parse(dados) : null;
+    };
+
+    const salvarLocalStorage = (dados) => {
+      localStorage.setItem('cras_queue_data', JSON.stringify(dados));
+    };
+
+    const dadosPadrao = {
+      cidadaos: [
+        { id: 1, nome: 'Maria Oliveira', cpf: '123.456.789-00', codigoFamiliar: '12345', status: 'Agendado', horarioAgendado: '08:00', prioridade: 'Idoso 60+' },
+        { id: 2, nome: 'João Silva', cpf: '987.654.321-11', codigoFamiliar: '54321', status: 'Finalizado', horarioCheckIn: '08:10', horarioTermino: '08:35', idAtendente: 1, numeroGuiche: '01', prioridade: 'Normal' },
+        { id: 3, nome: 'Ana Souza', cpf: '456.789.012-22', codigoFamiliar: '99999', status: 'Aguardando Atendimento', horarioCheckIn: '08:15', prioridade: 'Gestante' },
+        { id: 4, nome: 'Pedro Santos', cpf: '321.654.987-33', codigoFamiliar: '11223', status: 'Agendado', horarioAgendado: '09:00', prioridade: 'Normal' },
+        { id: 5, nome: 'Carla Lima', cpf: '789.012.345-44', codigoFamiliar: '44556', status: 'Aguardando Atendimento', horarioCheckIn: '08:45', prioridade: 'PCD' },
+        { id: 6, nome: 'Marcos Pereira', cpf: '654.321.098-55', codigoFamiliar: '77889', status: 'Agendado', horarioAgendado: '09:30', prioridade: 'Normal' },
+        { id: 7, nome: 'Fernanda Costa', cpf: '159.357.258-66', codigoFamiliar: '99887', status: 'Finalizado', horarioCheckIn: '09:00', horarioTermino: '09:20', idAtendente: 1, numeroGuiche: '02', prioridade: 'Idoso 80+' },
+        { id: 8, nome: 'Lucas Almeida', cpf: '753.951.456-77', codigoFamiliar: '66554', status: 'Ausente', horarioCheckIn: '09:10', prioridade: 'Normal' },
+        { id: 9, nome: 'Beatriz Rocha', cpf: '852.963.741-88', codigoFamiliar: '33221', status: 'Cancelado', motivoCancelamento: 'Documentação Irregular', horarioCheckIn: '09:20', prioridade: 'Autismo' },
+        { id: 10, nome: 'Gabriel Martins', cpf: '951.753.852-99', codigoFamiliar: '00112', status: 'Agendado', horarioAgendado: '10:00', prioridade: 'Normal' },
+        { id: 11, nome: 'Juliana Ferreira', cpf: '357.159.486-00', codigoFamiliar: '22334', status: 'Aguardando Atendimento', horarioCheckIn: '09:50', prioridade: 'Normal' },
+        { id: 12, nome: 'Rafael Mendes', cpf: '258.456.357-11', codigoFamiliar: '55667', status: 'Encaixe', horarioCheckIn: '09:55', prioridade: 'Normal' },
+        { id: 13, nome: 'Patrícia Gomes', cpf: '147.258.369-22', codigoFamiliar: '88990', status: 'Agendado', horarioAgendado: '10:30', prioridade: 'Gestante' },
+        { id: 14, nome: 'Rodrigo Barbosa', cpf: '369.258.147-33', codigoFamiliar: '12121', status: 'Agendado', horarioAgendado: '11:00', prioridade: 'Idoso 60+' },
+        { id: 15, nome: 'Sofia Alves', cpf: '741.852.963-44', codigoFamiliar: '34343', status: 'Agendado', horarioAgendado: '11:30', prioridade: 'PCD' }
+      ],
+      filaTV: [
+        { id: 7, nome: 'Fernanda Costa', numeroGuiche: '02', horarioChamada: '09:05', prioridade: 'Idoso 80+' },
+        { id: 2, nome: 'João Silva', numeroGuiche: '01', horarioChamada: '08:15', prioridade: 'Normal' }
+      ],
+      usuarios: [
+        { id: 1, nome: 'Operador Admin', email: 'admin@cras.gov.br', senha: '123', cpf: '000.000.000-00', funcao: 'gerente', polo: 'Central', ativo: true, assistenteSocial: false },
+        { id: 2, nome: 'Atendente 01', email: 'atendente1@cras.gov.br', senha: '123', cpf: '111.111.111-11', funcao: 'atendente', polo: 'Polo Norte', ativo: true, assistenteSocial: true }
+      ]
+    };
+
+    const carregarDados = () => {
+      const persistidos = carregarLocalStorage();
+      if (!persistidos) return dadosPadrao;
+
+      return {
+        cidadaos: persistidos.cidadaos || dadosPadrao.cidadaos,
+        filaTV: persistidos.filaTV || dadosPadrao.filaTV,
+        usuarios: persistidos.usuarios || dadosPadrao.usuarios
+      };
+    };
+
+    const dadosIniciais = carregarDados();
+
+    const estado = reactive({
+      usuarioAtual: null,
+      vistaAtiva: null,
+      moduloAtual: 'sistema',
+      snackbar: { mostrar: false, texto: '', cor: 'success' },
+      cidadaos: dadosIniciais.cidadaos,
+      filaTV: dadosIniciais.filaTV,
+      usuarios: dadosIniciais.usuarios,
+      chamadaAtual: null,
+      clima: { temperatura: '--', condicao: 'Carregando...', icone: 'mdi-cloud-outline' }
+    });
+
+    canal.onmessage = (evento) => {
+      const { tipo, dados } = evento.data;
+      if (tipo === 'ATUALIZACAO_ESTADO') {
+        Object.keys(dados).forEach(chave => {
+          if (chave !== 'usuarioAtual' && chave !== 'vistaAtiva') {
+            estado[chave] = dados[chave];
+          }
+        });
+        salvarLocalStorage({
+          cidadaos: JSON.parse(JSON.stringify(estado.cidadaos)),
+          filaTV: JSON.parse(JSON.stringify(estado.filaTV)),
+          usuarios: JSON.parse(JSON.stringify(estado.usuarios))
+        });
+      }
+    };
+
+    const transmitirEstado = () => {
+      const dadosParaSincronizar = {
+        cidadaos: JSON.parse(JSON.stringify(estado.cidadaos)),
+        chamadaAtual: JSON.parse(JSON.stringify(estado.chamadaAtual)),
+        filaTV: JSON.parse(JSON.stringify(estado.filaTV)),
+        clima: JSON.parse(JSON.stringify(estado.clima)),
+        usuarios: JSON.parse(JSON.stringify(estado.usuarios)),
+        snackbar: JSON.parse(JSON.stringify(estado.snackbar))
+      };
+
+      salvarLocalStorage({
+        cidadaos: dadosParaSincronizar.cidadaos,
+        filaTV: dadosParaSincronizar.filaTV,
+        usuarios: dadosParaSincronizar.usuarios
+      });
+
+      canal.postMessage({
+        tipo: 'ATUALIZACAO_ESTADO',
+        dados: dadosParaSincronizar
+      });
+    };
+
+    const acoes = {
+      definirUsuarioAtual(usuario) { estado.usuarioAtual = usuario; },
+
+      notificar(texto, cor = 'info') {
+        estado.snackbar = { mostrar: true, texto, cor };
+        setTimeout(() => { if (estado.snackbar.mostrar) estado.snackbar.mostrar = false; transmitirEstado(); }, 3000);
+        transmitirEstado();
+      },
+
+      adicionarUsuario(usuario) {
+        const novo = {
+          ...usuario,
+          id: Date.now(),
+          ativo: true
+        };
+        estado.usuarios.push(novo);
+        acoes.notificar(`Usuário ${novo.nome} cadastrado com sucesso!`, 'success');
+        transmitirEstado();
+      },
+
+      removerUsuario(id) {
+        const index = estado.usuarios.findIndex(u => u.id === id);
+        if (index !== -1) {
+          const nome = estado.usuarios[index].nome;
+          estado.usuarios.splice(index, 1);
+          acoes.notificar(`Usuário ${nome} removido.`, 'warning');
+          transmitirEstado();
+        }
+      },
+
+      login(email, senha) {
+        const usuario = estado.usuarios.find(u => u.email === email && u.ativo);
+        if (usuario) {
+          estado.usuarioAtual = usuario;
+          estado.vistaAtiva = usuario.funcao;
+          acoes.notificar(`Bem-vindo, ${usuario.nome}!`, 'success');
+          transmitirEstado();
+        } else {
+          acoes.notificar('Credenciais inválidas ou usuário inativo.', 'error');
+        }
+      },
+
+      sair() {
+        estado.usuarioAtual = null;
+        estado.vistaAtiva = null;
+        acoes.notificar('Sessão encerrada.', 'info');
+      },
+
+      mudarVista(vista) {
+        estado.vistaAtiva = vista;
+        transmitirEstado();
+      },
+
+      realizarCheckIn(idCidadao) {
+        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
+        if (cidadao) {
+          cidadao.status = 'Aguardando Atendimento';
+          cidadao.horarioCheckIn = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          acoes.notificar(`Check-in de ${cidadao.nome} realizado com sucesso!`, 'success');
+          transmitirEstado();
+        }
+      },
+      adicionarEncaixe(nome, cpf, prioridade = 'Normal') {
+        estado.cidadaos.push({
+          id: Date.now(), nome, cpf, status: 'Aguardando Atendimento', prioridade,
+          horarioCheckIn: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        });
+        acoes.notificar(`Encaixe de ${nome} (${prioridade}) adicionado!`, 'success');
+        transmitirEstado();
+      },
+      chamarCidadao(idCidadao, idAtendente, numeroGuiche) {
+        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
+        if (cidadao) {
+          if (cidadao.status === 'Em Chamada' && cidadao.idAtendente !== idAtendente) {
+            acoes.notificar('Este cidadão já está sendo chamado em outro guichê!', 'error');
+            return;
+          }
+          cidadao.status = 'Em Chamada';
+          cidadao.horarioChamada = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          cidadao.idAtendente = idAtendente;
+          cidadao.numeroGuiche = numeroGuiche;
+          estado.chamadaAtual = { ...cidadao };
+          acoes.notificar(`Chamando ${cidadao.nome} para guichê ${numeroGuiche}...`, 'primary');
+          transmitirEstado();
+        }
+      },
+      iniciarAtendimento(idCidadao) {
+        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
+        if (cidadao) {
+          cidadao.status = 'Em Atendimento';
+          cidadao.horarioInicioAtendimento = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          acoes.notificar(`Iniciando atendimento de ${cidadao.nome}.`, 'info');
+          transmitirEstado();
+        }
+      },
+      finalizarAtendimento(idCidadao) {
+        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
+        if (cidadao) {
+          cidadao.status = 'Finalizado';
+          cidadao.horarioTermino = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) {
+            estado.filaTV.unshift({ ...estado.chamadaAtual });
+            if (estado.filaTV.length > 5) estado.filaTV.pop();
+            estado.chamadaAtual = null;
+          }
+          acoes.notificar(`Atendimento de ${cidadao.nome} finalizado.`, 'success');
+          transmitirEstado();
+        }
+      },
+      marcarAusente(idCidadao) {
+        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
+        if (cidadao) {
+          cidadao.status = 'Ausente';
+          if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) estado.chamadaAtual = null;
+          acoes.notificar(`${cidadao.nome} marcado como ausente.`, 'warning');
+          transmitirEstado();
+        }
+      },
+      cancelarAtendimento(idCidadao, motivo) {
+        const cidadao = estado.cidadaos.find(c => c.id === idCidadao);
+        if (cidadao) {
+          cidadao.status = 'Cancelado';
+          cidadao.motivoCancelamento = motivo;
+          if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) estado.chamadaAtual = null;
+          acoes.notificar(`Atendimento cancelado: ${motivo}`, 'error');
+          transmitirEstado();
+        }
+      },
+
+      zerarSistema() {
+        if (confirm('ATENÇÃO: Isso apagará TODOS os dados do dia. Deseja continuar?')) {
+          estado.cidadaos = [];
+          estado.filaTV = [];
+          estado.chamadaAtual = null;
+          acoes.notificar('Sistema reiniciado com sucesso!', 'error');
+          transmitirEstado();
+        }
+      },
+
+      async buscarClima() {
+        try {
+          const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-15.7797&longitude=-47.9297&current=temperature_2m,weather_code&timezone=America%2FSao_Paulo');
+          const dados = await res.json();
+          const temperatura = Math.round(dados.current.temperature_2m);
+          const codigo = dados.current.weather_code;
+
+          let icone = 'mdi-weather-sunny';
+          let condicao = 'Ensolarado';
+
+          if (codigo >= 1 && codigo <= 3) { icone = 'mdi-weather-partly-cloudy'; condicao = 'Parcialmente Nublado'; }
+          else if (codigo >= 45 && codigo <= 48) { icone = 'mdi-weather-fog'; condicao = 'Nevoeiro'; }
+          else if (codigo >= 51 && codigo <= 67) { icone = 'mdi-weather-rainy'; condicao = 'Chuvoso'; }
+          else if (codigo >= 80 && codigo <= 99) { icone = 'mdi-weather-pouring'; condicao = 'Tempestade'; }
+
+          estado.clima = { temperatura, condicao, icone };
+          transmitirEstado();
+        } catch (e) {
+          console.error('Falha ao buscar clima', e);
+        }
+      }
+    };
+
+    const TelaLogin = {
+      setup() {
+        const credenciais = reactive({ email: '', senha: '' });
+        const carregando = ref(false);
+
+        const entrar = async () => {
+          carregando.value = true;
+          setTimeout(() => {
+            acoes.login(credenciais.email, credenciais.senha);
+            carregando.value = false;
+          }, 800);
+        };
+
+        return { credenciais, entrar, carregando };
+      },
+      template: `
+        <v-container fluid class="fill-height bg-grey-lighten-4">
+          <v-row justify="center" align="center">
+            <v-col cols="12" sm="8" md="4">
+              <v-card class="pa-8 rounded-xl elevation-12" style="border-top: 8px solid var(--v-theme-primary);">
+                <div class="text-center mb-8">
+                  <v-img src="logo-iaupe.png" max-height="80" contain class="mb-4"></v-img>
+                  <h1 class="text-h4 font-weight-black text-grey-darken-3">Acesso ao Sistema</h1>
+                  <p class="text-subtitle-1 text-grey">Gestão de Filas CRAS IAUPE</p>
+                </div>
+
+                <v-form @submit.prevent="entrar">
+                  <v-text-field
+                    label="E-mail"
+                    v-model="credenciais.email"
+                    prepend-inner-icon="mdi-email-outline"
+                    variant="outlined"
+                    color="primary"
+                    rounded="lg"
+                    class="mb-2"
+                  ></v-text-field>
+
+                  <v-text-field
+                    label="Senha"
+                    v-model="credenciais.senha"
+                    prepend-inner-icon="mdi-lock-outline"
+                    variant="outlined"
+                    color="primary"
+                    type="password"
+                    rounded="lg"
+                    class="mb-4"
+                  ></v-text-field>
+
+                  <v-btn
+                    block
+                    color="primary"
+                    size="x-large"
+                    rounded="lg"
+                    type="submit"
+                    :loading="carregando"
+                    elevation="6"
+                  >
+                    Entrar
+                  </v-btn>
+                </v-form>
+
+                <div class="text-center mt-8 text-caption text-grey">
+                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.0
+                </div>
+              </v-col>
+            </v-row>
+          </v-container>`
+    };
+
+    const TelaRecepcao = {
+      setup() {
+        const busca = ref('');
+        const dialogo = ref(false);
+        const dialogoValidacao = ref(false);
+        const cidadaoParaValidar = ref(null);
+        const entradaIdentidade = ref('');
+        const erroValidacao = ref(false);
+        const novoCidadao = reactive({ nome: '', cpf: '', prioridade: 'Normal' });
+        const opcoesPrioridade = Object.keys(PRIORIDADES);
+
+        const cabecalhos = [
+          { title: 'Prioridade', key: 'prioridade', width: '10%' },
+          { title: 'Nome', key: 'nome', align: 'start' },
+          { title: 'CPF', key: 'cpf' },
+          { title: 'Horário', key: 'horarioAgendado' },
+          { title: 'Status', key: 'status' },
+          { title: 'Ações', key: 'acoes', sortable: false },
+        ];
+
+        const agendamentosHoje = computed(() => estado.cidadaos.filter(c => c.status === 'Agendado' || (c.status === 'Aguardando Atendimento' && c.horarioAgendado)));
+
+        const formatarCPF = (cpf) => {
+          if (!cpf) return '';
+          const digitos = cpf.replace(/\D/g, '');
+          return digitos.length === 11 ? `***.${digitos.substring(3, 6)}.${digitos.substring(6, 9)}-**` : cpf;
+        };
+
+        const obterIconePrioridade = (p) => PRIORIDADES[p]?.icone || '';
+        const obterCorPrioridade = (p) => PRIORIDADES[p]?.cor || 'grey';
+
+        const salvarEncaixe = () => {
+          if (novoCidadao.nome && novoCidadao.cpf) {
+            acoes.adicionarEncaixe(novoCidadao.nome, novoCidadao.cpf, novoCidadao.prioridade);
+            novoCidadao.nome = ''; novoCidadao.cpf = ''; novoCidadao.prioridade = 'Normal'; dialogo.value = false;
+          }
+        };
+
+        const abrirModalValidacao = (cidadao) => {
+          cidadaoParaValidar.value = cidadao;
+          entradaIdentidade.value = '';
+          erroValidacao.value = false;
+          dialogoValidacao.value = true;
+        };
+
+        const confirmarIdentidade = () => {
+          if (!cidadaoParaValidar.value || !entradaIdentidade.value) return;
+
+          const entradaLimpa = entradaIdentidade.value.replace(/\D/g, '');
+          const cpfLimpo = cidadaoParaValidar.value.cpf ? cidadaoParaValidar.value.cpf.replace(/\D/g, '') : '';
+          const codigoFamiliarLimpo = cidadaoParaValidar.value.codigoFamiliar ? cidadaoParaValidar.value.codigoFamiliar.replace(/\D/g, '') : '';
+
+          const ehChaveTeste = /^0{3,}$/.test(entradaLimpa);
+
+          if (entradaLimpa === cpfLimpo || entradaLimpa === codigoFamiliarLimpo || ehChaveTeste) {
+            acoes.realizarCheckIn(cidadaoParaValidar.value.id);
+            dialogoValidacao.value = false;
+            cidadaoParaValidar.value = null;
+          } else {
+            erroValidacao.value = true;
+          }
+        };
+
+        return {
+          estado, acoes, busca, cabecalhos, agendamentosHoje, formatarCPF, dialogo, novoCidadao, salvarEncaixe,
+          dialogoValidacao,
+          cidadaoParaValidar,
+          entradaIdentidade,
+          abrirModalValidacao,
+          confirmarIdentidade,
+          erroValidacao,
+          opcoesPrioridade, obterIconePrioridade, obterCorPrioridade
+        };
+      },
+      template: `
+        <v-row>
+          <v-col cols="12">
+            <v-card class="glass-card mb-6 pa-2" elevation="0">
+              <v-card-text class="d-flex align-center pa-6">
+                <div>
+                  <h1 class="text-h4 font-weight-bold mb-1 text-primary">Check-in do Dia</h1>
+                  <p class="text-subtitle-1 text-grey-darken-1">Confirme a presença dos agendados ou realize novos encaixes.</p>
+                </div>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" size="large" prepend-icon="mdi-account-plus" rounded="pill" elevation="4" @click="dialogo = true">Novo Encaixe</v-btn>
+              </v-card-text>
+            </v-card>
+            <v-card class="glass-card pa-4" elevation="0">
+              <v-data-table :headers="cabecalhos" :items="agendamentosHoje" :search="busca" class="bg-transparent" hover items-per-page-text="Itens por página">
+                <template v-slot:item.prioridade="{ item }">
+                     <v-tooltip location="top" :text="item.prioridade" v-if="obterIconePrioridade(item.prioridade)">
+                        <template v-slot:activator="{ props }">
+                            <v-avatar v-bind="props" :color="obterCorPrioridade(item.prioridade)" size="32" variant="tonal">
+                                <v-icon size="20" class="icone-prioridade">{{ obterIconePrioridade(item.prioridade) }}</v-icon>
+                            </v-avatar>
+                        </template>
+                     </v-tooltip>
+                     <span v-else class="text-caption text-grey">Normal</span>
+                </template>
+                <template v-slot:item.cpf="{ item }"><span class="font-weight-medium">{{ formatarCPF(item.cpf) }}</span></template>
+                <template v-slot:item.status="{ item }">
+                  <v-chip :color="item.status === 'Agendado' ? 'grey-lighten-1' : 'success'" size="small" variant="tonal" class="font-weight-bold">{{ item.status }}</v-chip>
+                </template>
+                <template v-slot:item.acoes="{ item }">
+                  <v-tooltip text="Realizar Check-in">
+                    <template v-slot:activator="{ props }">
+                      <v-btn v-if="item.status === 'Agendado'" v-bind="props" icon="mdi-check-circle" color="success" variant="text" size="large" @click="abrirModalValidacao(item)"></v-btn>
+                    </template>
+                  </v-tooltip>
+                  <v-icon v-else color="success" size="large">mdi-check-all</v-icon>
+                </template>
+              </v-data-table>
+            </v-card>
+          </v-col>
+
+          <v-dialog v-model="dialogo" max-width="500">
+            <v-card rounded="xl" class="pa-6" elevation="10" style="backdrop-filter: blur(20px); background: rgba(255,255,255,0.95);">
+              <v-card-title class="text-h5 font-weight-bold text-primary mb-4">Adicionar Encaixe</v-card-title>
+              <v-card-text class="pa-0">
+                <v-text-field label="Nome Completo" v-model="novoCidadao.nome" variant="outlined" color="primary" class="mb-2" rounded="lg"></v-text-field>
+                <v-text-field label="CPF" v-model="novoCidadao.cpf" variant="outlined" color="primary" class="mb-2" rounded="lg"></v-text-field>
+                <v-select label="Prioridade (Lei)" v-model="novoCidadao.prioridade" :items="opcoesPrioridade" variant="outlined" color="primary" rounded="lg" prepend-inner-icon="mdi-human-queue"></v-select>
+              </v-card-text>
+              <v-card-actions class="mt-4 pa-0">
+                <v-spacer></v-spacer>
+                <v-btn variant="text" rounded="lg" @click="dialogo = false" size="large">Cancelar</v-btn>
+                <v-btn color="primary" variant="flat" rounded="lg" size="large" @click="salvarEncaixe" class="px-6">Confirmar</v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
+
+          <v-dialog v-model="dialogoValidacao" max-width="450">
+            <v-card rounded="xl" class="pa-6" elevation="16">
+              <v-card-item class="px-0 pb-4 text-center">
+                 <v-icon color="primary" size="48" class="mb-2">mdi-shield-account</v-icon>
+                 <v-card-title class="text-h5 font-weight-bold">Confirmar Identidade</v-card-title>
+                 <v-card-subtitle class="text-wrap">
+                    Para realizar o check-in de <strong>{{ cidadaoParaValidar?.nome }}</strong>, insira o CPF ou Código Familiar.
+                 </v-card-subtitle>
+              </v-card-item>
+              
+              <v-card-text class="px-0">
+                <v-text-field 
+                   label="CPF ou Código Familiar" 
+                   v-model="entradaIdentidade" 
+                   variant="outlined" 
+                   color="primary" 
+                   rounded="lg"
+                   prepend-inner-icon="mdi-badge-account-horizontal"
+                   :error-messages="erroValidacao ? 'Dados não conferem. Tente novamente.' : ''"
+                   @keyup.enter="confirmarIdentidade"
+                ></v-text-field>
+              </v-card-text>
+
+              <v-card-actions class="px-0 pt-2">
+                <v-btn variant="text" color="grey" rounded="lg" size="large" @click="dialogoValidacao = false">Cancelar</v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" variant="flat" rounded="lg" size="large" class="px-8" @click="confirmarIdentidade" :disabled="!entradaIdentidade">
+                   Confirmar Presença
+                </v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
+        </v-row>`
+    };
+
+    const TelaAtendimento = {
+      setup() {
+        const numeroGuiche = ref('03');
+        const cabecalhos = [
+          { title: 'Prio.', key: 'prioridade', width: '5%' },
+          { title: 'Cidadão', key: 'nome' }, { title: 'CPF', key: 'cpf' },
+          { title: 'Check-in', key: 'horarioCheckIn' }, { title: 'Status', key: 'status' }, { title: 'Ação', key: 'acoes', align: 'end' }
+        ];
+        const motivosCancelamento = ['Desistência', 'Documentação Irregular', 'Erro de Triagem', 'Outros'];
+
+        const filaEspera = computed(() => {
+          return estado.cidadaos
+            .filter(c => c.status === 'Aguardando Atendimento')
+            .sort((a, b) => {
+              const pesoA = PRIORIDADES[a.prioridade]?.ordem || 0;
+              const pesoB = PRIORIDADES[b.prioridade]?.ordem || 0;
+              if (pesoB !== pesoA) return pesoB - pesoA;
+              return a.id - b.id;
+            });
+        });
+
+        const meuCidadaoAtual = computed(() => estado.cidadaos.find(c => (c.status === 'Em Chamada' || c.status === 'Em Atendimento') && c.idAtendente === estado.usuarioAtual.id));
+        const totalAtendidosHoje = computed(() => estado.cidadaos.filter(c => c.status === 'Finalizado' && c.idAtendente === estado.usuarioAtual.id).length);
+
+        const chamar = (id) => acoes.chamarCidadao(id, estado.usuarioAtual.id, numeroGuiche.value);
+
+        const obterIconePrioridade = (p) => PRIORIDADES[p]?.icone || '';
+        const obterCorPrioridade = (p) => PRIORIDADES[p]?.cor || 'grey';
+
+        return { estado, acoes, numeroGuiche, cabecalhos, filaEspera, meuCidadaoAtual, totalAtendidosHoje, chamar, motivosCancelamento, obterIconePrioridade, obterCorPrioridade };
+      },
+      template: `
+        <v-row>
+          <v-col cols="12">
+            <v-row>
+              <v-col cols="12" md="4"><v-card class="glass-card pa-6 text-center" hover><div class="text-overline mb-1">Fila Geral</div><div class="text-h3 font-weight-bold text-primary">{{ filaEspera.length }}</div></v-card></v-col>
+              <v-col cols="12" md="4"><v-card class="glass-card pa-6 text-center" hover><div class="text-overline mb-1">Meus Atendimentos</div><div class="text-h3 font-weight-bold text-success">{{ totalAtendidosHoje }}</div></v-card></v-col>
+              <v-col cols="12" md="4"><v-card class="glass-card pa-6 text-center" hover><div class="text-overline mb-1">Guichê Atual</div><div class="text-h3 font-weight-bold text-grey-darken-2">{{ numeroGuiche }}</div></v-card></v-col>
+            </v-row>
+          </v-col>
+          
+          <v-col cols="12" v-if="meuCidadaoAtual">
+            <v-card class="glass-card mb-6 border-s-xl border-primary" elevation="4">
+              <v-card-item class="pa-6">
+                <template v-slot:prepend>
+                    <v-avatar :color="obterCorPrioridade(meuCidadaoAtual.prioridade)" size="64" variant="tonal" rounded="lg">
+                        <v-icon size="32">{{ obterIconePrioridade(meuCidadaoAtual.prioridade) || 'mdi-account-voice' }}</v-icon>
+                    </v-avatar>
+                </template>
+                <v-card-title class="text-h4 font-weight-bold">{{ meuCidadaoAtual.nome }}</v-card-title>
+                <div class="d-flex align-center mt-1">
+                    <v-chip v-if="obterIconePrioridade(meuCidadaoAtual.prioridade)" :color="obterCorPrioridade(meuCidadaoAtual.prioridade)" size="small" variant="flat" class="mr-2 text-uppercase font-weight-bold">
+                        {{ meuCidadaoAtual.prioridade }}
+                    </v-chip>
+                    <div class="text-h6 opacity-70">CPF: {{ meuCidadaoAtual.cpf }} &bull; Chamado às {{ meuCidadaoAtual.horarioChamada }}</div>
+                </div>
+                <template v-slot:append>
+                    <v-chip :color="meuCidadaoAtual.status === 'Em Chamada' ? 'warning' : 'info'" variant="flat" label class="text-uppercase font-weight-bold px-4">
+                        {{ meuCidadaoAtual.status }}
+                    </v-chip>
+                </template>
+              </v-card-item>
+              
+              <v-divider></v-divider>
+              
+              <v-card-actions class="pa-4 bg-grey-lighten-5">
+                <v-row no-gutters justify="end" align="center" class="gap-2">
+                    <div class="flex-grow-1 pl-2 text-caption text-grey">
+                        <v-icon size="small" class="mr-1">mdi-information-outline</v-icon>
+                        Ações disponíveis
+                    </div>
+                    
+                    <v-tooltip text="Enviar alerta sonoro para TV novamente" location="top">
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-if="meuCidadaoAtual.status === 'Em Chamada'" v-bind="props" variant="text" color="primary" prepend-icon="mdi-bullhorn-outline" @click="chamar(meuCidadaoAtual.id)">Rechamar</v-btn>
+                        </template>
+                    </v-tooltip>
+
+                    <v-tooltip text="Marcar como ausente e devolver para fila (opcional)" location="top">
+                        <template v-slot:activator="{ props }">
+                            <v-btn v-if="meuCidadaoAtual.status === 'Em Chamada'" v-bind="props" variant="text" color="grey-darken-1" prepend-icon="mdi-account-cancel-outline" @click="acoes.marcarAusente(meuCidadaoAtual.id)">Ausente</v-btn>
+                        </template>
+                    </v-tooltip>
+                    
+                    <v-menu location="bottom end" transition="scale-transition">
+                        <template v-slot:activator="{ props }">
+                             <v-btn v-bind="props" variant="text" color="error" prepend-icon="mdi-close-circle-outline">Cancelar</v-btn>
+                        </template>
+                        <v-list class="rounded-xl elevation-6 mt-2" width="220">
+                            <v-list-subheader class="text-uppercase font-weight-bold text-caption text-error">Motivo do Cancelamento</v-list-subheader>
+                            <v-list-item v-for="motivo in motivosCancelamento" :key="motivo" :value="motivo" density="compact" @click="acoes.cancelarAtendimento(meuCidadaoAtual.id, motivo)">
+                                <v-list-item-title class="font-weight-medium">{{ motivo }}</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+
+                    <v-btn v-if="meuCidadaoAtual.status === 'Em Chamada'" color="success" variant="tonal" prepend-icon="mdi-check" class="ml-2 px-6" @click="acoes.iniciarAtendimento(meuCidadaoAtual.id)">Iniciar Atendimento</v-btn>
+                    
+                    <v-btn v-if="meuCidadaoAtual.status === 'Em Atendimento'" color="primary" variant="flat" prepend-icon="mdi-check-all" class="ml-2 px-6" @click="acoes.finalizarAtendimento(meuCidadaoAtual.id)">Finalizar Atendimento</v-btn>
+                </v-row>
+              </v-card-actions>
+            </v-card>
+          </v-col>
+          
+          <v-col cols="12">
+            <v-card class="glass-card pa-4">
+              <v-card-title class="text-h6 font-weight-bold mb-4">Próximos da Fila (Ordenação Automática)</v-card-title>
+              <v-data-table :headers="cabecalhos" :items="filaEspera" class="bg-transparent" hover items-per-page-text="Itens por página">
+                <template v-slot:item.prioridade="{ item }">
+                     <v-tooltip location="top" :text="item.prioridade" v-if="obterIconePrioridade(item.prioridade)">
+                        <template v-slot:activator="{ props }">
+                            <v-avatar v-bind="props" :color="obterCorPrioridade(item.prioridade)" size="32" variant="tonal">
+                                <v-icon size="20" class="icone-prioridade">{{ obterIconePrioridade(item.prioridade) }}</v-icon>
+                            </v-avatar>
+                        </template>
+                     </v-tooltip>
+                </template>
+                <template v-slot:item.horarioCheckIn="{ item }"><v-icon icon="mdi-clock-outline" size="small" class="mr-1"></v-icon> {{ item.horarioCheckIn }}</template>
+                <template v-slot:item.status="{ item }"><v-chip size="small" color="warning" variant="flat" class="font-weight-bold">{{ item.status }}</v-chip></template>
+                <template v-slot:item.acoes="{ item }">
+                  <v-btn color="primary" rounded="pill" size="small" variant="flat" class="px-6 font-weight-bold" @click="chamar(item.id)" :disabled="!!meuCidadaoAtual" elevation="1">Chamar</v-btn>
+                </template>
+              </v-data-table>
+            </v-card>
+          </v-col>
+        </v-row>`
+    };
+
+    const TelaUsuarios = {
+      setup() {
+        const dialogo = ref(false);
+        const novoUsuario = reactive({
+          nome: '', email: '', cpf: '', senha: '', confirmeSenha: '',
+          funcao: 'atendente', polo: '', assistenteSocial: false
+        });
+
+        const polos = ['Central', 'Polo Norte', 'Polo Sul', 'Polo Leste', 'Polo Oeste'];
+        const gruposAcesso = [
+          { title: 'Gestor', value: 'gerente' },
+          { title: 'Recepção', value: 'recepcao' },
+          { title: 'Atendente', value: 'atendente' }
+        ];
+
+        const cabecalhos = [
+          { title: 'Nome', key: 'nome' },
+          { title: 'E-mail', key: 'email' },
+          { title: 'CPF', key: 'cpf' },
+          { title: 'Polo', key: 'polo' },
+          { title: 'Grupo', key: 'funcao' },
+          { title: 'Status', key: 'ativo' },
+          { title: 'Ações', key: 'acoes', align: 'end' }
+        ];
+
+        const salvar = () => {
+          if (novoUsuario.senha !== novoUsuario.confirmeSenha) {
+            acoes.notificar('As senhas não conferem!', 'error');
+            return;
+          }
+          acoes.adicionarUsuario({ ...novoUsuario });
+          dialogo.value = false;
+          Object.assign(novoUsuario, { nome: '', email: '', cpf: '', senha: '', confirmeSenha: '', funcao: 'atendente', polo: '', assistenteSocial: false });
+        };
+
+        return { estado, acoes, dialogo, novoUsuario, polos, gruposAcesso, cabecalhos, salvar };
+      },
+      template: `
+        <v-row>
+          <v-col cols="12">
+            <v-card class="glass-card mb-6 pa-2" elevation="0">
+              <v-card-text class="d-flex align-center pa-6">
+                <div>
+                  <h1 class="text-h4 font-weight-bold mb-1 text-primary">Gestão de Usuários</h1>
+                  <p class="text-subtitle-1 text-grey-darken-1">Gerencie os colaboradores e seus níveis de acesso ao sistema.</p>
+                </div>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" size="large" prepend-icon="mdi-account-plus" rounded="pill" elevation="4" @click="dialogo = true">Novo Usuário</v-btn>
+              </v-card-text>
+            </v-card>
+
+            <v-card class="glass-card pa-4" elevation="0">
+              <v-data-table :headers="cabecalhos" :items="estado.usuarios" class="bg-transparent" hover>
+                <template v-slot:item.funcao="{ item }">
+                  <v-chip size="small" :color="item.funcao === 'gerente' ? 'purple' : 'blue'" variant="tonal" class="font-weight-bold text-uppercase">
+                    {{ item.funcao }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.ativo="{ item }">
+                  <v-chip :color="item.ativo ? 'success' : 'error'" size="x-small" variant="flat">
+                    {{ item.ativo ? 'ATIVO' : 'INATIVO' }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.acoes="{ item }">
+                  <v-btn icon="mdi-delete-outline" color="error" variant="text" @click="acoes.removerUsuario(item.id)" :disabled="item.id === estado.usuarioAtual.id"></v-btn>
+                </template>
+              </v-data-table>
+            </v-card>
+          </v-col>
+
+          <v-dialog v-model="dialogo" max-width="600">
+            <v-card rounded="xl" class="pa-6" elevation="10">
+              <v-card-title class="text-h5 font-weight-bold text-primary mb-4">Novo Usuário</v-card-title>
+              <v-card-text class="pa-0">
+                <v-switch v-model="novoUsuario.assistenteSocial" label="Este usuário é assistente social?" color="primary" density="compact" class="mb-2"></v-switch>
+                
+                <v-select label="Polo *" v-model="novoUsuario.polo" :items="polos" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-select>
+                
+                <v-text-field label="Nome Completo *" v-model="novoUsuario.nome" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
+                
+                <v-text-field label="E-mail *" v-model="novoUsuario.email" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
+                
+                <v-row>
+                   <v-col cols="12" sm="6">
+                      <v-text-field label="Senha *" v-model="novoUsuario.senha" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
+                   </v-col>
+                   <v-col cols="12" sm="6">
+                      <v-text-field label="Confirme sua senha *" v-model="novoUsuario.confirmeSenha" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
+                   </v-col>
+                </v-row>
+
+                <v-row class="mt-n4">
+                   <v-col cols="12" sm="6">
+                      <v-text-field label="CPF *" v-model="novoUsuario.cpf" variant="outlined" color="primary" rounded="lg"></v-text-field>
+                   </v-col>
+                   <v-col cols="12" sm="6">
+                      <v-select label="Grupo de Acesso *" v-model="novoUsuario.funcao" :items="gruposAcesso" variant="outlined" color="primary" rounded="lg"></v-select>
+                   </v-col>
+                </v-row>
+
+                <v-switch v-model="novoUsuario.ativo" label="Ativo" color="success" density="compact" readonly :model-value="true"></v-switch>
+              </v-card-text>
+              <v-card-actions class="mt-4 pa-0">
+                <v-btn variant="text" rounded="lg" @click="dialogo = false" size="large">Fechar</v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" variant="flat" rounded="lg" size="large" @click="salvar" class="px-8">Salvar</v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
+        </v-row>`
+    };
+
+    const TelaGestor = {
+      components: { TelaRecepcao, TelaAtendimento, TelaUsuarios },
+      setup() {
+        const aba = ref('dashboard');
+
+        const estatisticas = computed(() => {
+          const finalizados = estado.cidadaos.filter(c => c.status === 'Finalizado');
+
+          let somaEspera = 0;
+          let contagemEspera = 0;
+          finalizados.forEach(c => {
+            if (c.horarioCheckIn && c.horarioChamada) {
+              const [h1, m1] = c.horarioCheckIn.split(':').map(Number);
+              const [h2, m2] = c.horarioChamada.split(':').map(Number);
+              const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+              if (diff >= 0) { somaEspera += diff; contagemEspera++; }
+            }
+          });
+          const tempoMedio = contagemEspera > 0 ? Math.round(somaEspera / contagemEspera) : 0;
+
+          return [
+            { title: 'Total', value: estado.cidadaos.length, color: 'primary', icon: 'mdi-account-group' },
+            { title: 'Espera Atual', value: estado.cidadaos.filter(c => c.status === 'Aguardando Atendimento').length, color: 'warning', icon: 'mdi-timer-sand' },
+            { title: 'Tempo Médio Espera', value: tempoMedio + ' min', color: 'info', icon: 'mdi-clock-fast' },
+            { title: 'Finalizados', value: finalizados.length, color: 'success', icon: 'mdi-check-decagram' }
+          ];
+        });
+
+        const exportarCSV = () => {
+          const headers = ['ID,Nome,CPF,Status,Horario Chegada,Horario Chamada,Horario Termino,Prioridade'];
+          const rows = estado.cidadaos.map(c =>
+            `${c.id},"${c.nome}",${c.cpf},${c.status},${c.horarioCheckIn || ''},${c.horarioChamada || ''},${c.horarioTermino || ''},${c.prioridade || ''}`
+          );
+          const csvContent = headers.concat(rows).join('\n');
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `relatorio_cras_iaupe_${new Date().toISOString().slice(0, 10)}.csv`);
+          link.click();
+        };
+
+        return { estado, acoes, estatisticas, aba, exportarCSV };
+      },
+      template: `
+        <div>
+            <v-tabs v-model="aba" color="primary" align-tabs="start" class="mb-6 rounded-lg bg-white-50 elevation-0">
+                <v-tab value="dashboard" class="text-body-1 font-weight-bold"><v-icon start>mdi-view-dashboard</v-icon> Painel</v-tab>
+                <v-tab value="usuarios" class="text-body-1 font-weight-bold"><v-icon start>mdi-account-multiple-plus</v-icon> Usuários</v-tab>
+                <v-tab value="recepcao" class="text-body-1 font-weight-bold"><v-icon start>mdi-account-check</v-icon> Recepção</v-tab>
+                <v-tab value="atendente" class="text-body-1 font-weight-bold"><v-icon start>mdi-desk-lamp</v-icon> Atendimento</v-tab>
+            </v-tabs>
+
+            <v-window v-model="aba">
+                <v-window-item value="dashboard">
+                    <v-row>
+                      <v-col v-for="s in estatisticas" :key="s.title" cols="12" sm="6" md="3">
+                        <v-card class="glass-card pa-6" hover>
+                            <div class="d-flex align-center">
+                                <v-avatar :color="s.color" variant="tonal" rounded="lg" size="50" class="mr-4"><v-icon size="28">{{ s.icon }}</v-icon></v-avatar>
+                                <div>
+                                    <div class="text-overline text-grey-darken-1 lh-1">{{ s.title }}</div>
+                                    <div class="text-h4 font-weight-bold text-grey-darken-3">{{ s.value }}</div>
+                                </div>
+                            </div>
+                        </v-card>
+                      </v-col>
+                      
+                      <v-col cols="12">
+                        <v-card class="glass-card pa-6 mt-4">
+                            <div class="d-flex align-center justify-space-between mb-4">
+                                <v-card-title class="text-h6 font-weight-bold pl-0">Ações Administrativas</v-card-title>
+                            </div>
+                            <div class="d-flex gap-4">
+                                <v-btn color="success" variant="flat" prepend-icon="mdi-file-excel" @click="exportarCSV">
+                                    Exportar Relatório (CSV)
+                                </v-btn>
+                                <v-btn color="error" variant="outlined" prepend-icon="mdi-delete-alert" @click="acoes.zerarSistema">
+                                    Zerar Sistema (Reiniciar Dia)
+                                </v-btn>
+                            </div>
+                        </v-card>
+                      </v-col>
+
+                      <v-col cols="12">
+                        <v-card class="glass-card pa-6 mt-4">
+                          <v-card-title class="text-h6 font-weight-bold mb-4">Visão Geral da Operação</v-card-title>
+                          <v-data-table :items="estado.cidadaos" :headers="[{title:'Nome', key:'nome'}, {title:'CPF', key:'cpf'}, {title:'Status', key:'status'}, {title:'Horário Chegada', key:'horarioCheckIn'}]" class="bg-transparent" hover items-per-page-text="Itens por página">
+                             <template v-slot:item.status="{ item }">
+                                <v-chip :color="item.status === 'Finalizado' ? 'success' : item.status === 'Ausente' ? 'error' : item.status === 'Cancelado' ? 'grey' : 'primary'" size="small" variant="flat" class="font-weight-bold">{{ item.status }}</v-chip>
+                             </template>
+                          </v-data-table>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                </v-window-item>
+                
+                <v-window-item value="usuarios">
+                    <tela-usuarios></tela-usuarios>
+                </v-window-item>
+
+                <v-window-item value="recepcao">
+                    <tela-recepcao></tela-recepcao>
+                </v-window-item>
+
+                <v-window-item value="atendente">
+                    <tela-atendimento></tela-atendimento>
+                </v-window-item>
+            </v-window>
+        </div>`
+    };
+
+    const TelaTV = {
+      setup() {
+        const audioBeep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
+        const falar = (texto) => {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const fala = new SpeechSynthesisUtterance(texto);
+            fala.lang = 'pt-BR';
+            fala.rate = 1.0;
+            fala.pitch = 1.0;
+            const vozes = window.speechSynthesis.getVoices();
+            const vozPT = vozes.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+            if (vozPT) fala.voice = vozPT;
+            window.speechSynthesis.speak(fala);
+          }
+        };
+
+        watch(() => estado.chamadaAtual, (novaChamada) => {
+          if (novaChamada) {
+            audioBeep.play().catch(() => { });
+            setTimeout(() => {
+              const msg = `Atenção, ${novaChamada.nome}, compareça ao Guichê ${novaChamada.numeroGuiche}`;
+              falar(msg);
+            }, 800);
+          }
+        }, { deep: true });
+
+        const horarioAtual = ref(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+        setInterval(() => { horarioAtual.value = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }, 1000);
+
+        onMounted(() => {
+          acoes.buscarClima();
+          setInterval(acoes.buscarClima, 600000);
+          window.speechSynthesis.getVoices();
+        });
+
+        return { estado, horarioAtual };
+      },
+      template: `
+        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: #000; color: white;">
+          <v-container fluid class="fill-height pa-0 ma-0" style="height: 100%;">
+            <v-row no-gutters class="fill-height ma-0">
+              
+              <v-col cols="8" class="d-flex flex-column position-relative overflow-hidden bg-gradiente h-100">
+                 
+                <div class="bg-brilho-1"></div>
+                <div class="bg-brilho-2"></div>
+
+                <div class="d-flex justify-space-between align-center px-8 py-6 w-100" style="z-index: 20; height: 120px;">
+                   <div class="d-flex align-center gap-4">
+                       <v-icon size="56" color="yellow-darken-1">{{ estado.clima.icone }}</v-icon>
+                       <div>
+                           <div class="text-h3 font-weight-bold">{{ estado.clima.temperatura }}°C</div>
+                           <div class="text-subtitle-1 text-grey-lighten-1">{{ estado.clima.condicao }}</div>
+                       </div>
+                   </div>
+                   <div class="text-h2 font-weight-light opacity-90">{{ horarioAtual }}</div>
+                </div>
+
+                <div class="flex-grow-1 d-flex flex-column justify-center align-center w-100" style="z-index: 10;">
+                  <transition name="scale-fade" mode="out-in">
+                    
+                    <div v-if="estado.chamadaAtual" :key="estado.chamadaAtual.id" class="text-center w-100 px-12">
+                        <div class="d-flex align-center justify-center gap-4 mb-6">
+                            <v-icon color="blue-lighten-2" size="48" class="icone-pulso">mdi-bell-ring</v-icon>
+                            <span class="text-h4 text-uppercase font-weight-medium text-blue-lighten-1 tracking-widest">Chamada Atual</span>
+                        </div>
+                        
+                        <div class="glass-container pa-8 rounded-xl elevation-24 mb-10 mx-auto" style="width: fit-content; max-width: 95%;">
+                            <div class="text-h1 font-weight-black text-white text-uppercase tracking-wide" 
+                                 style="font-size: 4.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; text-shadow: 0 4px 60px rgba(56,189,248,0.5);">
+                                 {{ estado.chamadaAtual.nome }}
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-center justify-center gap-6">
+                            <span class="text-h3 font-weight-light text-grey-lighten-1">Dirija-se ao Guichê</span>
+                            <v-card color="primary" class="px-16 py-6 rounded-xl elevation-10" min-width="300">
+                                <span class="text-h1 font-weight-black text-white" style="font-size: 5rem;">{{ estado.chamadaAtual.numeroGuiche }}</span>
+                            </v-card>
+                        </div>
+                    </div>
+
+                    <div v-else class="text-center">
+                        <div class="circulo-espera mx-auto mb-8">
+                            <v-icon size="80" color="white" class="opacity-50">mdi-clock-outline</v-icon>
+                        </div>
+                        <div class="text-h3 text-grey-lighten-2 font-weight-light tracking-wide">Aguardando Próxima Chamada...</div>
+                         <div class="mt-4 text-h6 text-grey font-weight-regular">Por favor, aguarde em seu lugar.</div>
+                    </div>
+                  </transition>
+                </div>
+                
+                 <div class="w-100 py-4 text-center text-grey text-caption" style="z-index: 20; background: rgba(0,0,0,0.2);">
+                    Gestão de Filas Inteligente &bull; CRAS IAUPE Premium
+                </div>
+              </v-col>
+
+              <v-col cols="4" class="h-100 bg-grey-darken-4 d-flex flex-column elevation-10" style="z-index: 20; border-left: 1px solid rgba(255,255,255,0.1);">
+                <div class="pa-8 pb-4 bg-grey-darken-4">
+                    <div class="d-flex align-center gap-4 mb-2">
+                        <v-icon color="success" size="32">mdi-history</v-icon>
+                        <span class="text-h4 font-weight-bold">Últimas Chamadas</span>
+                    </div>
+                    <v-divider class="my-4 border-opacity-25"></v-divider>
+                </div>
+                
+                <div class="flex-grow-1 overflow-y-auto px-6 pb-6">
+                   <transition-group name="list" tag="div">
+                      <v-card v-for="(chamada, i) in estado.filaTV" :key="chamada.id" 
+                              class="mb-4 bg-grey-darken-3 rounded-lg border-0 elevation-4"
+                              :class="{'active-history-card': i === 0}"
+                              style="transition: all 0.5s ease;">
+                          <v-card-text class="pa-5">
+                              <div class="d-flex align-center justify-space-between mb-2">
+                                  <div class="text-h5 font-weight-bold text-white">{{ chamada.nome }}</div>
+                                  <v-chip color="primary" variant="flat" size="small" class="font-weight-bold">GUICHÊ {{ chamada.numeroGuiche }}</v-chip>
+                              </div>
+                              <div class="d-flex align-center justify-space-between">
+                                  <div class="text-body-2 text-grey-lighten-1">
+                                    <v-icon size="small" class="mr-1" color="grey">mdi-clock-check-outline</v-icon>
+                                    Chamado às {{ chamada.horarioChamada }}
+                                  </div>
+                                  <v-icon v-if="chamada.prioridade !== 'Normal'" :color="chamada.prioridade.includes('Idoso') ? 'orange' : 'pink'" size="small">mdi-star</v-icon>
+                              </div>
+                          </v-card-text>
+                      </v-card>
+                   </transition-group>
+                   
+                   <div v-if="estado.filaTV.length === 0" class="text-center mt-12 text-grey-darken-1">
+                        <v-icon size="64" class="mb-4 opacity-20">mdi-clipboard-text-clock-outline</v-icon>
+                        <div class="text-h6 opacity-50">Histórico Vazio</div>
+                   </div>
+                </div>
+              </v-col>
+            </v-row>
+          </v-container>
+        </div>`
+    };
+
+    const AppLayout = {
+      setup() {
+        const gaveta = ref(true);
+        const nomesVistas = { recepcao: 'Recepção', atendente: 'Atendente', gerente: 'Gestor' };
+
+        const abrirTV = () => window.open('?view=tv', '_blank');
+
+        const rotuloVista = computed(() => {
+          return nomesVistas[estado.vistaAtiva] || 'Desconhecido';
+        });
+
+        return { estado, acoes, gaveta, abrirTV, rotuloVista };
+      },
+      template: `
+        <div v-if="estado.moduloAtual === 'tv'">
+            <slot></slot>
+        </div>
+        <div v-else>
+          <v-navigation-drawer v-model="gaveta" app color="white" width="280">
+            <template v-slot:prepend>
+              <div class="pa-4 d-flex align-center">
+                <v-img src="logo-iaupe.png" max-width="40" class="mr-2"></v-img>
+                <span class="text-h6 font-weight-bold text-primary">Fila CRAS IAUPE</span>
+              </div>
+            </template>
+            
+            <v-divider></v-divider>
+
+            <v-list nav class="pa-2">
+              <v-list-item 
+                v-if="estado.usuarioAtual?.funcao === 'gerente' || estado.usuarioAtual?.funcao === 'recepcao'"
+                :active="estado.vistaAtiva === 'recepcao'"
+                @click="acoes.mudarVista('recepcao')"
+                prepend-icon="mdi-account-check" 
+                title="Recepção" 
+                rounded="lg"
+                active-color="primary"
+                class="mb-1"
+              ></v-list-item>
+              <v-list-item 
+                v-if="estado.usuarioAtual?.funcao === 'gerente' || estado.usuarioAtual?.funcao === 'atendente'"
+                :active="estado.vistaAtiva === 'atendente'"
+                @click="acoes.mudarVista('atendente')"
+                prepend-icon="mdi-desk-lamp" 
+                title="Atendente" 
+                rounded="lg"
+                active-color="primary"
+                class="mb-1"
+              ></v-list-item>
+              <v-list-item 
+                v-if="estado.usuarioAtual?.funcao === 'gerente'"
+                :active="estado.vistaAtiva === 'gerente'"
+                @click="acoes.mudarVista('gerente')"
+                prepend-icon="mdi-chart-box" 
+                title="Gestor" 
+                rounded="lg"
+                active-color="primary"
+              ></v-list-item>
+            </v-list>
+
+            <template v-slot:append>
+              <div class="pa-4">
+                <v-btn block color="grey-darken-3" prepend-icon="mdi-television-play" rounded="lg" size="large" @click="abrirTV" class="mb-2">
+                    Abrir TV
+                </v-btn>
+                <v-btn block color="error" variant="tonal" prepend-icon="mdi-logout" rounded="lg" size="large" @click="acoes.sair">
+                    Sair
+                </v-btn>
+              </div>
+            </template>
+          </v-navigation-drawer>
+
+          <v-app-bar flat color="transparent" class="px-4 mt-2">
+            <v-app-bar-nav-icon @click="gaveta = !gaveta"></v-app-bar-nav-icon>
+            <v-toolbar-title class="text-subtitle-1 font-weight-bold text-grey-darken-2">
+              Painel de <span class="text-primary">{{ rotuloVista }}</span>
+            </v-toolbar-title>
+            <v-spacer></v-spacer>
+            <div class="mr-4 d-none d-sm-flex flex-column align-end">
+               <span class="text-caption font-weight-bold text-grey-darken-3">{{ estado.usuarioAtual?.nome }}</span>
+               <span class="text-caption opacity-60">{{ estado.usuarioAtual?.polo || 'Sem Polo' }}</span>
+            </div>
+            <v-btn icon color="grey">
+              <v-icon>mdi-bell-outline</v-icon>
+            </v-btn>
+            <v-btn icon color="grey">
+              <v-icon>mdi-cog-outline</v-icon>
+            </v-btn>
+          </v-app-bar>
+
+          <v-main>
+            <v-container fluid class="pa-6">
+              <slot></slot>
+            </v-container>
+            <v-snackbar v-model="estado.snackbar.mostrar" :color="estado.snackbar.cor" location="top right" timeout="3000" rounded="pill" elevation="6">
+                <v-icon start class="mr-2">mdi-information</v-icon>
+                {{ estado.snackbar.texto }}
+            </v-snackbar>
+          </v-main>
+        </div>`
+    };
+
+    const app = createApp({
+      components: { TelaLogin, TelaRecepcao, TelaAtendimento, TelaGestor, AppLayout, TelaTV },
+      setup() {
+        const componenteAtual = computed(() => {
+          if (estado.moduloAtual === 'tv') return TelaTV;
+          if (!estado.usuarioAtual) return TelaLogin;
+
+          switch (estado.vistaAtiva) {
+            case 'recepcao': return TelaRecepcao;
+            case 'atendente': return TelaAtendimento;
+            case 'gerente': return TelaGestor;
+            default: return TelaRecepcao;
+          }
+        });
+
+        onMounted(() => {
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.get('view') === 'tv') {
+            estado.moduloAtual = 'tv';
+          }
+        });
+
+        return { componenteAtual, estado };
+      },
+      template: `
+        <v-app>
+          <component v-if="estado.moduloAtual === 'tv' || !estado.usuarioAtual" :is="componenteAtual"></component>
+          <app-layout v-else>
+            <component :is="componenteAtual"></component>
+          </app-layout>
+        </v-app>`
+    });
+
+    app.use(createVuetify());
+    app.mount('#app');
+  </script>
+</body>
+
+</html>

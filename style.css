@@ -1,0 +1,133 @@
+:root {
+  --v-theme-primary: #2563EB;
+  --v-theme-secondary: #475569;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+body, .v-application {
+  font-family: 'Inter', sans-serif !important;
+  background: #F3F6FC !important;
+  background-image:
+    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+  background-size: 100% 100vh;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: #1e293b !important;
+}
+
+.glass-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--glass-shadow) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.12) !important;
+}
+
+.v-btn {
+  text-transform: none !important;
+  letter-spacing: 0.5px !important;
+  font-weight: 600 !important;
+}
+
+.v-navigation-drawer {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(20px) !important;
+  border: none !important;
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.icone-prioridade { animation: bounce-slow 2s infinite ease-in-out; }
+
+.animacao-pulso { animation: pulse 2s infinite; }
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+  70% { transform: scale(1.02); opacity: 1; box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
+  100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+.text-fade-enter-active, .text-fade-leave-active { transition: opacity 0.5s ease; }
+.text-fade-enter-from, .text-fade-leave-to { opacity: 0; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.z-index-10 { z-index: 10; }
+.glass-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.bg-gradiente {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.bg-brilho-1 {
+    position: absolute; top: -10%; left: -10%; width: 50%; height: 50%; 
+    background: #38bdf8; filter: blur(300px); opacity: 0.15;
+    animation: flutuar 10s ease-in-out infinite;
+}
+.bg-brilho-2 {
+    position: absolute; bottom: -10%; right: -10%; width: 50%; height: 50%; 
+    background: #818cf8; filter: blur(300px); opacity: 0.15;
+    animation: flutuar 10s ease-in-out infinite reverse;
+}
+
+@keyframes flutuar {
+    0% { transform: translate(0, 0); }
+    50% { transform: translate(30px, 50px); }
+    100% { transform: translate(0, 0); }
+}
+
+.circulo-espera {
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.02);
+    animation: anel-pulso 3s infinite;
+}
+
+@keyframes anel-pulso {
+    0% { box-shadow: 0 0 0 0 rgba(255,255,255, 0.1); }
+    70% { box-shadow: 0 0 0 30px rgba(255,255,255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255, 0); }
+}
+
+.icone-pulso { animation: opacidade-pulso 1.5s infinite; }
+@keyframes opacidade-pulso {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+.scale-fade-enter-active, .scale-fade-leave-active { transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.scale-fade-enter-from, .scale-fade-leave-to { opacity: 0; transform: scale(0.95); }
+
+.active-history-card { 
+    background: rgba(37, 99, 235, 0.15) !important; 
+    border-color: #2563EB !important;
+}
+
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
