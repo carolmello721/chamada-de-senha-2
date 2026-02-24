@@ -265,8 +265,8 @@
           if (usuariosSnap.empty) {
             console.log("Semeando usuários iniciais...");
             const usuariosPadrao = [
-              { nome: 'Operador Admin', email: 'admin@cras.gov.br', senha: '123', cpf: '000.000.000-00', funcao: 'gerente', polo: 'Central', ativo: true, assistenteSocial: false },
-              { nome: 'Atendente 01', email: 'atendente1@cras.gov.br', senha: '123', cpf: '111.111.111-11', funcao: 'atendente', polo: 'Polo Norte', ativo: true, assistenteSocial: true }
+              { nome: 'Operador Admin', email: 'admin@cras.gov.br', senha: '123', cpf: '000.000.000-00', funcao: 'gerente', polo: 'Cras Araguainha', ativo: true, assistenteSocial: false },
+              { nome: 'Atendente 01', email: 'atendente1@cras.gov.br', senha: '123', cpf: '111.111.111-11', funcao: 'atendente', polo: 'Cras Santo Afonso', ativo: true, assistenteSocial: true }
             ];
             for (const u of usuariosPadrao) {
               await db.collection("usuarios").add(u);
@@ -716,7 +716,7 @@
           novoUsuario.cpf = aplicarMascaraCPF(v);
         });
 
-        const polos = ['Central', 'Polo Norte', 'Polo Sul', 'Polo Leste', 'Polo Oeste'];
+        const polos = ['Cras Araguainha', 'Cras Santo Afonso'];
         const gruposAcesso = [
           { title: 'Gestor', value: 'gerente' },
           { title: 'Recepção', value: 'recepcao' },
