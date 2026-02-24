@@ -1258,6 +1258,21 @@
             estado.moduloAtual = 'tv';
           }
           acoes.semearDados();
+
+          // Mantém a sessão ativa após F5
+          auth.onAuthStateChanged(async (user) => {
+            if (user) {
+              const doc = await db.collection("usuarios").doc(user.uid).get();
+              if (doc.exists && doc.data().ativo) {
+                estado.usuarioAtual = { id: doc.id, ...doc.data() };
+                // Apenas muda a vista se não estiver no modo TV
+                if (estado.moduloAtual !== 'tv') {
+                  estado.vistaAtiva = estado.usuarioAtual.funcao;
+                }
+                console.log("Sessão restaurada para:", user.email);
+              }
+            }
+          });
         });
 
         return { componenteAtual, estado };
