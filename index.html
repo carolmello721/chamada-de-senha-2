@@ -117,15 +117,24 @@
           const result = await auth.signInWithEmailAndPassword(email, senha);
           const uid = result.user.uid;
 
-          // Busca dados extras do usuário no Firestore
-          const doc = await db.collection("usuarios").doc(uid).get();
-          if (doc.exists && doc.data().ativo) {
-            estado.usuarioAtual = { id: doc.id, ...doc.data() };
-            estado.vistaAtiva = estado.usuarioAtual.funcao;
-            acoes.notificar(`Bem-vindo, ${estado.usuarioAtual.nome}!`, 'success');
+          // Busca dados extras do usuário no Firestore filtrando pelo e-mail
+          const emailLogin = result.user.email.toLowerCase();
+          const snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
+
+          if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            const dados = doc.data();
+            if (dados.ativo) {
+              estado.usuarioAtual = { id: doc.id, ...dados };
+              estado.vistaAtiva = estado.usuarioAtual.funcao;
+              acoes.notificar(`Bem-vindo, ${estado.usuarioAtual.nome}!`, 'success');
+            } else {
+              await auth.signOut();
+              acoes.notificar('Usuário inativo no sistema.', 'error');
+            }
           } else {
             await auth.signOut();
-            acoes.notificar('Usuário inativo ou não cadastrado no banco de dados.', 'error');
+            acoes.notificar('Acesso autorizado no Firebase, mas perfil não encontrado no banco de dados.', 'error');
           }
         } catch (error) {
           console.error("Erro no login:", error);
@@ -1262,8 +1271,11 @@
           // Mantém a sessão ativa após F5
           auth.onAuthStateChanged(async (user) => {
             if (user) {
-              const doc = await db.collection("usuarios").doc(user.uid).get();
-              if (doc.exists && doc.data().ativo) {
+              const emailLogin = user.email.toLowerCase();
+              const snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
+
+              if (!snapshot.empty) {
+                const doc = snapshot.docs[0];
                 estado.usuarioAtual = { id: doc.id, ...doc.data() };
                 // Apenas muda a vista se não estiver no modo TV
                 if (estado.moduloAtual !== 'tv') {
