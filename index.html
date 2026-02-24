@@ -4,12 +4,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
-  <title>Gestão de Filas CRAS IAUPE - Premium</title>
+  <title>CRAS IAUPE | Sistema de Chamada</title>
+  <link rel="icon" type="image/png" href="logo-iaupe.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/vuetify@3.5.8/dist/vuetify.min.css" rel="stylesheet">
   <link href="style.css" rel="stylesheet">
@@ -198,14 +198,19 @@
       },
 
       async finalizarAtendimento(idCidadao) {
-        const horarioTermino = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const agora = new Date();
+        const horarioTerminoCurto = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const dataFim = agora.toISOString().split('T')[0];
+        const horarioTerminoCompleto = `${agora.toLocaleDateString('pt-BR')} ${horarioTerminoCurto}`;
+
         await db.collection("cidadaos").doc(idCidadao).update({
           status: 'Finalizado',
-          horarioTermino
+          horarioTermino: horarioTerminoCompleto,
+          dataFim
         });
 
         if (estado.chamadaAtual && estado.chamadaAtual.id === idCidadao) {
-          const finalizado = { ...estado.chamadaAtual, status: 'Finalizado', horarioTermino };
+          const finalizado = { ...estado.chamadaAtual, status: 'Finalizado', horarioTermino: horarioTerminoCompleto };
           estado.filaTV.unshift(finalizado);
           if (estado.filaTV.length > 5) estado.filaTV.pop();
           estado.chamadaAtual = null;
@@ -455,7 +460,7 @@
 
 
                 <div class="text-center mt-8 text-caption text-grey">
-                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.4
+                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.5
                 </div>
               </v-card>
             </v-col>
@@ -1026,6 +1031,91 @@
         </div>`
     };
 
+    const TelaHistorico = {
+      setup() {
+        const buscaCPF = ref('');
+        const buscaData = ref('');
+        const resultados = ref([]);
+        const carregando = ref(false);
+
+        const cabecalhos = [
+          { title: 'Data/Hora Finalização', key: 'horarioTermino', width: '20%' },
+          { title: 'Cidadão', key: 'nome' },
+          { title: 'CPF', key: 'cpf' },
+          { title: 'Atendente', key: 'atendente' },
+          { title: 'Guichê', key: 'numeroGuiche', width: '10%' }
+        ];
+
+        const pesquisar = async () => {
+          carregando.value = true;
+          try {
+            let querySnapshot = await db.collection("cidadaos").where("status", "==", "Finalizado").get();
+            let docs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (buscaCPF.value) {
+              const cpfLimpo = buscaCPF.value.replace(/\D/g, '');
+              docs = docs.filter(d => d.cpf && d.cpf.replace(/\D/g, '').includes(cpfLimpo));
+            }
+
+            if (buscaData.value) {
+              docs = docs.filter(d => d.dataFim === buscaData.value);
+            }
+
+            resultados.value = docs.map(d => {
+              const atendente = estado.usuarios.find(u => u.id === d.idAtendente)?.nome || 'Sistema';
+              return {
+                horarioTermino: d.horarioTermino,
+                nome: d.nome,
+                cpf: d.cpf,
+                atendente,
+                numeroGuiche: d.numeroGuiche || '---'
+              };
+            }).sort((a, b) => (b.horarioTermino || '').localeCompare(a.horarioTermino || ''));
+
+            if (resultados.value.length === 0) acoes.notificar("Nenhum registro encontrado.", "info");
+          } catch (e) {
+            console.error(e);
+            acoes.notificar("Erro ao acessar histórico.", "error");
+          } finally {
+            carregando.value = false;
+          }
+        };
+
+        return { buscaCPF, buscaData, resultados, cabecalhos, carregando, pesquisar, formatarCPF };
+      },
+      template: `
+        <v-row>
+          <v-col cols="12">
+            <v-card class="glass-card pa-6 mb-6" elevation="0">
+              <div class="d-flex align-center mb-4">
+                 <v-icon color="primary" size="32" class="mr-2">mdi-history</v-icon>
+                 <h1 class="text-h4 font-weight-bold text-primary">Histórico de Atendimentos</h1>
+              </div>
+              <v-row>
+                <v-col cols="12" md="4">
+                  <v-text-field label="Pesquisar por CPF" v-model="buscaCPF" variant="outlined" rounded="lg" prepend-inner-icon="mdi-magnify" @keyup.enter="pesquisar" hide-details class="mb-2"></v-text-field>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <v-text-field label="Data específica" v-model="buscaData" type="date" variant="outlined" rounded="lg" prepend-inner-icon="mdi-calendar" hide-details class="mb-2"></v-text-field>
+                </v-col>
+                <v-col cols="12" md="4" class="d-flex align-center">
+                  <v-btn color="primary" size="large" rounded="lg" block @click="pesquisar" :loading="carregando" elevation="4">Pesquisar</v-btn>
+                </v-col>
+              </v-row>
+            </v-card>
+
+            <v-card class="glass-card pa-4" elevation="0">
+              <v-data-table :headers="cabecalhos" :items="resultados" class="bg-transparent" hover items-per-page-text="Itens por página" :loading="carregando">
+                <template v-slot:item.cpf="{ item }"><span class="font-weight-medium">{{ formatarCPF(item.cpf) }}</span></template>
+                <template v-slot:item.horarioTermino="{ item }">
+                    <v-chip size="small" variant="tonal" class="font-weight-bold" color="primary">{{ item.horarioTermino }}</v-chip>
+                </template>
+              </v-data-table>
+            </v-card>
+          </v-col>
+        </v-row>`
+    };
+
     const TelaTV = {
       setup() {
         const audioBeep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -1224,6 +1314,16 @@
                 title="Gestor" 
                 rounded="lg"
                 active-color="primary"
+                class="mb-1"
+              ></v-list-item>
+              <v-list-item 
+                v-if="['gerente', 'visualizador', 'atendente', 'recepcao'].includes(estado.usuarioAtual?.funcao)"
+                :active="estado.vistaAtiva === 'historico'"
+                @click="acoes.mudarVista('historico')"
+                prepend-icon="mdi-history" 
+                title="Histórico" 
+                rounded="lg"
+                active-color="primary"
               ></v-list-item>
             </v-list>
 
@@ -1280,6 +1380,7 @@
             case 'recepcao': return TelaRecepcao;
             case 'atendente': return TelaAtendimento;
             case 'gerente': return TelaGestor;
+            case 'historico': return TelaHistorico;
             default: return TelaRecepcao;
           }
         });

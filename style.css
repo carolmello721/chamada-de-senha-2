@@ -1,12 +1,15 @@
 :root {
-  --v-theme-primary: #2563EB;
+  --v-theme-primary: #004587;
+  --v-theme-primary-red: #a61d24;
   --v-theme-secondary: #475569;
-  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-bg: rgba(255, 255, 255, 0.75);
   --glass-border: rgba(255, 255, 255, 0.4);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 69, 135, 0.08);
+  /* Usando o azul IAUPE na sombra */
 }
 
-body, .v-application {
+body,
+.v-application {
   font-family: 'Inter', sans-serif !important;
   background: #F3F6FC !important;
   background-image:
@@ -47,87 +50,190 @@ body, .v-application {
 }
 
 @keyframes bounce-slow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
 }
 
-.icone-prioridade { animation: bounce-slow 2s infinite ease-in-out; }
+.icone-prioridade {
+  animation: bounce-slow 2s infinite ease-in-out;
+}
 
-.animacao-pulso { animation: pulse 2s infinite; }
+.animacao-pulso {
+  animation: pulse 2s infinite;
+}
 
 @keyframes pulse {
-  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
-  70% { transform: scale(1.02); opacity: 1; box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
-  100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 69, 135, 0.7);
+  }
+
+  70% {
+    transform: scale(1.02);
+    opacity: 1;
+    box-shadow: 0 0 0 15px rgba(0, 69, 135, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 69, 135, 0);
+  }
 }
 
-.text-fade-enter-active, .text-fade-leave-active { transition: opacity 0.5s ease; }
-.text-fade-enter-from, .text-fade-leave-to { opacity: 0; }
+.text-fade-enter-active,
+.text-fade-leave-active {
+  transition: opacity 0.5s ease;
+}
 
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.text-fade-enter-from,
+.text-fade-leave-to {
+  opacity: 0;
+}
 
-.z-index-10 { z-index: 10; }
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.z-index-10 {
+  z-index: 10;
+}
+
 .glass-container {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
 .bg-gradiente {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border-right: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .bg-brilho-1 {
-    position: absolute; top: -10%; left: -10%; width: 50%; height: 50%; 
-    background: #38bdf8; filter: blur(300px); opacity: 0.15;
-    animation: flutuar 10s ease-in-out infinite;
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 50%;
+  height: 50%;
+  background: #38bdf8;
+  filter: blur(300px);
+  opacity: 0.15;
+  animation: flutuar 10s ease-in-out infinite;
 }
+
 .bg-brilho-2 {
-    position: absolute; bottom: -10%; right: -10%; width: 50%; height: 50%; 
-    background: #818cf8; filter: blur(300px); opacity: 0.15;
-    animation: flutuar 10s ease-in-out infinite reverse;
+  position: absolute;
+  bottom: -10%;
+  right: -10%;
+  width: 50%;
+  height: 50%;
+  background: #818cf8;
+  filter: blur(300px);
+  opacity: 0.15;
+  animation: flutuar 10s ease-in-out infinite reverse;
 }
 
 @keyframes flutuar {
-    0% { transform: translate(0, 0); }
-    50% { transform: translate(30px, 50px); }
-    100% { transform: translate(0, 0); }
+  0% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(30px, 50px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
 }
 
 .circulo-espera {
-    width: 160px; height: 160px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,0.02);
-    animation: anel-pulso 3s infinite;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+  animation: anel-pulso 3s infinite;
 }
 
 @keyframes anel-pulso {
-    0% { box-shadow: 0 0 0 0 rgba(255,255,255, 0.1); }
-    70% { box-shadow: 0 0 0 30px rgba(255,255,255, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255,255,255, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1);
+  }
+
+  70% {
+    box-shadow: 0 0 0 30px rgba(255, 255, 255, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
 }
 
-.icone-pulso { animation: opacidade-pulso 1.5s infinite; }
+.icone-pulso {
+  animation: opacidade-pulso 1.5s infinite;
+}
+
 @keyframes opacidade-pulso {
-    0% { opacity: 0.5; }
-    50% { opacity: 1; }
-    100% { opacity: 0.5; }
+  0% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.5;
+  }
 }
 
-.scale-fade-enter-active, .scale-fade-leave-active { transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-.scale-fade-enter-from, .scale-fade-leave-to { opacity: 0; transform: scale(0.95); }
-
-.active-history-card { 
-    background: rgba(37, 99, 235, 0.15) !important; 
-    border-color: #2563EB !important;
+.scale-fade-enter-active,
+.scale-fade-leave-active {
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.gap-4 { gap: 1rem; }
-.gap-6 { gap: 1.5rem; }
+.scale-fade-enter-from,
+.scale-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.active-history-card {
+  background: rgba(0, 69, 135, 0.15) !important;
+  border-color: #004587 !important;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.gap-6 {
+  gap: 1.5rem;
+}
