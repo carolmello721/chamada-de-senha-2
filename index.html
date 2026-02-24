@@ -21,7 +21,7 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.8/dist/vuetify.js"></script>
 
-  <!-- Firebase Compat SDKs (Better for opening file directly) -->
+  <!-- SDKs de Compatibilidade do Firebase (Melhor para abrir arquivos locais) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -36,7 +36,7 @@
       measurementId: "G-Z89VVLQZN5"
     };
 
-    // Initialize Firebase
+    // Inicializar Firebase
     console.log("Iniciando conexão com Firebase...");
     let db;
     try {
@@ -236,6 +236,7 @@
 
       async buscarClima() {
         try {
+          // Busca dados meteorológicos simplificados
           const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-15.7797&longitude=-47.9297&current=temperature_2m,weather_code&timezone=America%2FSao_Paulo');
           const dados = await res.json();
           const temperatura = Math.round(dados.current.temperature_2m);
@@ -825,7 +826,7 @@
     const TelaGestor = {
       components: { TelaRecepcao, TelaAtendimento, TelaUsuarios },
       setup() {
-        const aba = ref('dashboard');
+        const aba = ref('painel');
 
         const estatisticas = computed(() => {
           const finalizados = estado.cidadaos.filter(c => c.status === 'Finalizado');
@@ -869,14 +870,14 @@
       template: `
         <div>
             <v-tabs v-model="aba" color="primary" align-tabs="start" class="mb-6 rounded-lg bg-white-50 elevation-0">
-                <v-tab value="dashboard" class="text-body-1 font-weight-bold"><v-icon start>mdi-view-dashboard</v-icon> Painel</v-tab>
+                <v-tab value="painel" class="text-body-1 font-weight-bold"><v-icon start>mdi-view-dashboard</v-icon> Painel</v-tab>
                 <v-tab value="usuarios" class="text-body-1 font-weight-bold"><v-icon start>mdi-account-multiple-plus</v-icon> Usuários</v-tab>
                 <v-tab value="recepcao" class="text-body-1 font-weight-bold"><v-icon start>mdi-account-check</v-icon> Recepção</v-tab>
                 <v-tab value="atendente" class="text-body-1 font-weight-bold"><v-icon start>mdi-desk-lamp</v-icon> Atendimento</v-tab>
             </v-tabs>
 
             <v-window v-model="aba">
-                <v-window-item value="dashboard">
+                <v-window-item value="painel">
                     <v-row>
                       <v-col v-for="s in estatisticas" :key="s.title" cols="12" sm="6" md="3">
                         <v-card class="glass-card pa-6" hover>
@@ -942,7 +943,7 @@
           if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
             const fala = new SpeechSynthesisUtterance(texto);
-            fala.lang = 'pt-BR';
+            fala.lang = 'pt-BR'; // Define idioma para Português Brasil
             fala.rate = 1.0;
             fala.pitch = 1.0;
             const vozes = window.speechSynthesis.getVoices();
@@ -988,7 +989,7 @@
                        <v-icon size="56" color="yellow-darken-1">{{ estado.clima.icone }}</v-icon>
                        <div>
                            <div class="text-h3 font-weight-bold">{{ estado.clima.temperatura }}°C</div>
-                           <div class="text-subtitle-1 text-grey-lighten-1">{{ estado.clima.condicao }}</div>
+                           <div class="text-subtitle-2 text-grey-lighten-1">{{ estado.clima.condicao }}</div>
                        </div>
                    </div>
                    <div class="text-h2 font-weight-light opacity-90">{{ horarioAtual }}</div>
@@ -1204,6 +1205,7 @@
       },
       template: `
         <v-app>
+          <!-- Gerenciador de visibilidade de componentes principal -->
           <component v-if="estado.moduloAtual === 'tv' || !estado.usuarioAtual" :is="componenteAtual"></component>
           <app-layout v-else>
             <component :is="componenteAtual"></component>
