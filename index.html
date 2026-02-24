@@ -285,6 +285,19 @@
         }
       },
 
+      async semearDadosManual() {
+        if (confirm('Deseja adicionar cidadãos de teste para check-in?')) {
+          const cidadaosPadrao = [
+            { nome: 'Carlos Ferreira', cpf: '222.333.444-55', codigoFamiliar: '11223', status: 'Agendado', horarioAgendado: '09:30', prioridade: 'Normal' },
+            { nome: 'Lucia Santos', cpf: '555.666.777-88', codigoFamiliar: '44556', status: 'Agendado', horarioAgendado: '10:00', prioridade: 'PCD' },
+            { nome: 'Marcos Lima', cpf: '888.999.000-11', codigoFamiliar: '77889', status: 'Agendado', horarioAgendado: '10:30', prioridade: 'Idoso 80+' }
+          ];
+          for (const c of cidadaosPadrao) {
+            await db.collection("cidadaos").add(c);
+          }
+          acoes.notificar("Dados de teste adicionados!", "success");
+        }
+      },
       async buscarClima() {
         try {
           // Busca dados meteorológicos simplificados
@@ -332,7 +345,10 @@
             const cidadaosPadrao = [
               { nome: 'Maria Oliveira', cpf: '123.456.789-00', codigoFamiliar: '12345', status: 'Agendado', horarioAgendado: '08:00', prioridade: 'Idoso 60+' },
               { nome: 'João Silva', cpf: '987.654.321-11', codigoFamiliar: '54321', status: 'Finalizado', horarioCheckIn: '08:10', horarioTermino: '08:35', idAtendente: 1, numeroGuiche: '01', prioridade: 'Normal' },
-              { nome: 'Ana Souza', cpf: '456.789.012-22', codigoFamiliar: '99999', status: 'Aguardando Atendimento', horarioCheckIn: '08:15', prioridade: 'Gestante' }
+              { nome: 'Ana Souza', cpf: '456.789.012-22', codigoFamiliar: '99999', status: 'Aguardando Atendimento', horarioCheckIn: '08:15', prioridade: 'Gestante' },
+              { nome: 'Carlos Ferreira', cpf: '222.333.444-55', codigoFamiliar: '11223', status: 'Agendado', horarioAgendado: '09:30', prioridade: 'Normal' },
+              { nome: 'Lucia Santos', cpf: '555.666.777-88', codigoFamiliar: '44556', status: 'Agendado', horarioAgendado: '10:00', prioridade: 'PCD' },
+              { nome: 'Marcos Lima', cpf: '888.999.000-11', codigoFamiliar: '77889', status: 'Agendado', horarioAgendado: '10:30', prioridade: 'Idoso 80+' }
             ];
             for (const c of cidadaosPadrao) {
               await db.collection("cidadaos").add(c);
@@ -438,7 +454,7 @@
 
 
                 <div class="text-center mt-8 text-caption text-grey">
-                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.2
+                  &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.3
                 </div>
               </v-card>
             </v-col>
@@ -973,6 +989,9 @@
                                 </v-btn>
                                 <v-btn v-if="estado.usuarioAtual?.funcao === 'gerente'" color="error" variant="outlined" prepend-icon="mdi-delete-alert" @click="acoes.zerarSistema">
                                     Zerar Sistema (Reiniciar Dia)
+                                </v-btn>
+                                <v-btn v-if="estado.usuarioAtual?.funcao === 'gerente'" color="info" variant="tonal" prepend-icon="mdi-database-plus" @click="acoes.semearDadosManual">
+                                    Adicionar Dados de Teste
                                 </v-btn>
                             </div>
                         </v-card>
