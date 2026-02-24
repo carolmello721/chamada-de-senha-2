@@ -167,16 +167,25 @@
       },
 
       login(email, senha) {
-        const usuario = estado.usuarios.find(u => u.email === email && u.ativo);
+        const emailLimpo = email.trim().toLowerCase();
+        const senhaLimpa = senha.trim();
+
+        const usuario = estado.usuarios.find(u =>
+          u.email.toLowerCase() === emailLimpo &&
+          u.senha === senhaLimpa &&
+          u.ativo
+        );
+
         if (usuario) {
           estado.usuarioAtual = usuario;
           estado.vistaAtiva = usuario.funcao;
           acoes.notificar(`Bem-vindo, ${usuario.nome}!`, 'success');
           transmitirEstado();
         } else {
-          acoes.notificar('Credenciais inválidas ou usuário inativo.', 'error');
+          acoes.notificar('Usuário ou senha inválidos, ou conta inativa.', 'error');
         }
       },
+
 
       sair() {
         estado.usuarioAtual = null;
@@ -362,6 +371,15 @@
                 <div class="text-center mt-8 text-caption text-grey">
                   &copy; 2026 CRAS IAUPE &bull; Versão Premium 2.0
                 </div>
+
+                <v-divider class="my-4"></v-divider>
+                <div class="text-center">
+                  <v-btn variant="text" size="x-small" color="grey" @click="localStorage.clear(); location.reload();">
+                    <v-icon start size="small">mdi-database-refresh-outline</v-icon>
+                    Limpar Dados Locais (Reset)
+                  </v-btn>
+                </div>
+
               </v-col>
             </v-row>
           </v-container>`
