@@ -21,9 +21,10 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.8/dist/vuetify.js"></script>
 
-  <!-- SDKs de Compatibilidade do Firebase (Melhor para abrir arquivos locais) -->
+  <!-- SDKs de Compatibilidade do Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -38,11 +39,12 @@
 
     // Inicializar Firebase
     console.log("Iniciando conexão com Firebase...");
-    let db;
+    let db, auth;
     try {
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
-      console.log("Firebase Firestore inicializado com sucesso!");
+      auth = firebase.auth();
+      console.log("Firebase Firestore e Auth inicializados com sucesso!");
     } catch (error) {
       console.error("Erro ao inicializar Firebase:", error);
     }
@@ -105,19 +107,31 @@
       mudarVista(vista) {
         estado.vistaAtiva = vista;
       },
-      sair() {
+      async sair() {
+        await auth.signOut();
         estado.usuarioAtual = null;
         estado.vistaAtiva = 'login';
       },
-      login(email, senha) {
-        const emailNormal = email.trim().toLowerCase();
-        const usuario = estado.usuarios.find(u => u.email.toLowerCase() === emailNormal && u.senha === senha && u.ativo);
-        if (usuario) {
-          estado.usuarioAtual = usuario;
-          estado.vistaAtiva = usuario.funcao;
-          acoes.notificar(`Bem-vindo, ${usuario.nome}!`, 'success');
-        } else {
-          acoes.notificar('Credenciais inválidas ou usuário inativo.', 'error');
+      async login(email, senha) {
+        try {
+          const result = await auth.signInWithEmailAndPassword(email, senha);
+          const uid = result.user.uid;
+
+          // Busca dados extras do usuário no Firestore
+          const doc = await db.collection("usuarios").doc(uid).get();
+          if (doc.exists && doc.data().ativo) {
+            estado.usuarioAtual = { id: doc.id, ...doc.data() };
+            estado.vistaAtiva = estado.usuarioAtual.funcao;
+            acoes.notificar(`Bem-vindo, ${estado.usuarioAtual.nome}!`, 'success');
+          } else {
+            await auth.signOut();
+            acoes.notificar('Usuário inativo ou não cadastrado no banco de dados.', 'error');
+          }
+        } catch (error) {
+          console.error("Erro no login:", error);
+          let msg = "Erro ao entrar. Verifique e-mail e senha.";
+          if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') msg = "E-mail ou senha incorretos.";
+          acoes.notificar(msg, 'error');
         }
       },
 
@@ -206,12 +220,35 @@
       },
 
       async adicionarUsuario(dados) {
-        await db.collection("usuarios").add({
-          ...dados,
-          ativo: true,
-          criadoEm: new Date().toISOString()
-        });
-        acoes.notificar('Usuário criado com sucesso!', 'success');
+        try {
+          // Nota: Criar usuário no Auth pelo Frontend desloga o atual. 
+          // Para evitar isso sem Cloud Functions, criaremos apenas no Firestore 
+          // e o primeiro login precisará que o Admin crie a senha no console OU 
+          // usaremos um fluxo simplificado se o usuário permitir.
+
+          // Por enquanto, criaremos no Firestore. O ID será gerado automaticamente.
+          // O Gestor deve então criar o usuário no console do Firebase Auth com o mesmo e-mail.
+
+          const docRef = await db.collection("usuarios").add({
+            ...dados,
+            ativo: true,
+            criadoEm: new Date().toISOString()
+          });
+          acoes.notificar('Perfil criado! Lembre-se de criar o acesso no console do Firebase Auth.', 'success');
+        } catch (error) {
+          console.error("Erro ao adicionar usuário:", error);
+          acoes.notificar("Erro ao criar perfil.", "error");
+        }
+      },
+
+      async editarUsuario(id, dados) {
+        try {
+          await db.collection("usuarios").doc(id).update(dados);
+          acoes.notificar('Usuário atualizado com sucesso!', 'success');
+        } catch (error) {
+          console.error("Erro ao editar usuário:", error);
+          acoes.notificar("Erro ao atualizar usuário.", "error");
+        }
       },
 
       async removerUsuario(id) {
@@ -706,7 +743,7 @@
     const TelaUsuarios = {
       setup() {
         const dialogo = ref(false);
-        const formValido = ref(false);
+        const editando = ref(null);
         const novoUsuario = reactive({
           nome: '', email: '', cpf: '', senha: '', confirmeSenha: '',
           funcao: 'atendente', polo: '', assistenteSocial: false
@@ -720,7 +757,8 @@
         const gruposAcesso = [
           { title: 'Gestor', value: 'gerente' },
           { title: 'Recepção', value: 'recepcao' },
-          { title: 'Atendente', value: 'atendente' }
+          { title: 'Atendente', value: 'atendente' },
+          { title: 'Visualizador', value: 'visualizador' }
         ];
 
         const cabecalhos = [
@@ -733,17 +771,37 @@
           { title: 'Ações', key: 'acoes', align: 'end' }
         ];
 
+        const abrirEdicao = (usuario) => {
+          editando.value = usuario.id;
+          Object.assign(novoUsuario, {
+            nome: usuario.nome,
+            email: usuario.email,
+            cpf: usuario.cpf,
+            funcao: usuario.funcao,
+            polo: usuario.polo,
+            assistenteSocial: usuario.assistenteSocial,
+            senha: '', confirmeSenha: '' // Senha não é editável aqui por segurança
+          });
+          dialogo.value = true;
+        };
+
         const salvar = () => {
           if (formValido.value) {
-            acoes.adicionarUsuario({ ...novoUsuario });
+            if (editando.value) {
+              const { senha, confirmeSenha, ...rest } = novoUsuario;
+              acoes.editarUsuario(editando.value, rest);
+            } else {
+              acoes.adicionarUsuario({ ...novoUsuario });
+            }
             dialogo.value = false;
+            editando.value = null;
             Object.assign(novoUsuario, { nome: '', email: '', cpf: '', senha: '', confirmeSenha: '', funcao: 'atendente', polo: '', assistenteSocial: false });
-          } else if (novoUsuario.senha !== novoUsuario.confirmeSenha) {
+          } else if (!editando.value && novoUsuario.senha !== novoUsuario.confirmeSenha) {
             acoes.notificar('As senhas não conferem!', 'error');
           }
         };
 
-        return { estado, acoes, dialogo, novoUsuario, polos, gruposAcesso, cabecalhos, salvar, regras: regrasYaml, formValido };
+        return { estado, acoes, dialogo, novoUsuario, polos, gruposAcesso, cabecalhos, salvar, regras: regrasYaml, formValido, editando, abrirEdicao };
       },
       template: `
         <v-row>
@@ -755,7 +813,7 @@
                   <p class="text-subtitle-1 text-grey-darken-1">Gerencie os colaboradores e seus níveis de acesso ao sistema.</p>
                 </div>
                 <v-spacer></v-spacer>
-                <v-btn color="primary" size="large" prepend-icon="mdi-account-plus" rounded="pill" elevation="4" @click="dialogo = true">Novo Usuário</v-btn>
+                <v-btn v-if="estado.usuarioAtual?.funcao === 'gerente'" color="primary" size="large" prepend-icon="mdi-account-plus" rounded="pill" elevation="4" @click="dialogo = true">Novo Usuário</v-btn>
               </v-card-text>
             </v-card>
 
@@ -772,7 +830,8 @@
                   </v-chip>
                 </template>
                 <template v-slot:item.acoes="{ item }">
-                  <v-btn icon="mdi-delete-outline" color="error" variant="text" @click="acoes.removerUsuario(item.id)" :disabled="item.id === estado.usuarioAtual.id"></v-btn>
+                  <v-btn v-if="estado.usuarioAtual?.funcao === 'gerente'" icon="mdi-pencil-outline" color="primary" variant="text" @click="abrirEdicao(item)"></v-btn>
+                  <v-btn v-if="estado.usuarioAtual?.funcao === 'gerente'" icon="mdi-delete-outline" color="error" variant="text" @click="acoes.removerUsuario(item.id)" :disabled="item.id === estado.usuarioAtual.id"></v-btn>
                 </template>
               </v-data-table>
             </v-card>
@@ -780,7 +839,7 @@
 
           <v-dialog v-model="dialogo" max-width="600">
             <v-card rounded="xl" class="pa-6" elevation="10">
-              <v-card-title class="text-h5 font-weight-bold text-primary mb-4">Novo Usuário</v-card-title>
+              <v-card-title class="text-h5 font-weight-bold text-primary mb-4">{{ editando ? 'Editar Usuário' : 'Novo Usuário' }}</v-card-title>
               <v-form v-model="formValido">
                 <v-card-text class="pa-0">
                   <v-switch v-model="novoUsuario.assistenteSocial" label="Este usuário é assistente social?" color="primary" density="compact" class="mb-2"></v-switch>
@@ -789,9 +848,9 @@
                   
                   <v-text-field label="Nome Completo *" v-model="novoUsuario.nome" :rules="[regras.obrigatorio]" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
                   
-                  <v-text-field label="E-mail *" v-model="novoUsuario.email" :rules="[regras.obrigatorio, regras.email]" variant="outlined" color="primary" rounded="lg" class="mb-2"></v-text-field>
+                  <v-text-field label="E-mail *" v-model="novoUsuario.email" :rules="[regras.obrigatorio, regras.email]" variant="outlined" color="primary" rounded="lg" class="mb-2" :readonly="!!editando"></v-text-field>
                   
-                  <v-row>
+                  <v-row v-if="!editando">
                     <v-col cols="12" sm="6">
                         <v-text-field label="Senha *" v-model="novoUsuario.senha" :rules="[regras.obrigatorio, regras.senhaCurta]" type="password" variant="outlined" color="primary" rounded="lg"></v-text-field>
                     </v-col>
@@ -900,7 +959,7 @@
                                 <v-btn color="success" variant="flat" prepend-icon="mdi-file-excel" @click="exportarCSV">
                                     Exportar Relatório (CSV)
                                 </v-btn>
-                                <v-btn color="error" variant="outlined" prepend-icon="mdi-delete-alert" @click="acoes.zerarSistema">
+                                <v-btn v-if="estado.usuarioAtual?.funcao === 'gerente'" color="error" variant="outlined" prepend-icon="mdi-delete-alert" @click="acoes.zerarSistema">
                                     Zerar Sistema (Reiniciar Dia)
                                 </v-btn>
                             </div>
@@ -1106,7 +1165,7 @@
 
             <v-list nav class="pa-2">
               <v-list-item 
-                v-if="estado.usuarioAtual?.funcao === 'gerente' || estado.usuarioAtual?.funcao === 'recepcao'"
+                v-if="['gerente', 'recepcao', 'visualizador'].includes(estado.usuarioAtual?.funcao)"
                 :active="estado.vistaAtiva === 'recepcao'"
                 @click="acoes.mudarVista('recepcao')"
                 prepend-icon="mdi-account-check" 
@@ -1116,7 +1175,7 @@
                 class="mb-1"
               ></v-list-item>
               <v-list-item 
-                v-if="estado.usuarioAtual?.funcao === 'gerente' || estado.usuarioAtual?.funcao === 'atendente'"
+                v-if="['gerente', 'atendente', 'visualizador'].includes(estado.usuarioAtual?.funcao)"
                 :active="estado.vistaAtiva === 'atendente'"
                 @click="acoes.mudarVista('atendente')"
                 prepend-icon="mdi-desk-lamp" 
@@ -1126,7 +1185,7 @@
                 class="mb-1"
               ></v-list-item>
               <v-list-item 
-                v-if="estado.usuarioAtual?.funcao === 'gerente'"
+                v-if="['gerente', 'visualizador'].includes(estado.usuarioAtual?.funcao)"
                 :active="estado.vistaAtiva === 'gerente'"
                 @click="acoes.mudarVista('gerente')"
                 prepend-icon="mdi-chart-box" 
