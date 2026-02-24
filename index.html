@@ -113,28 +113,33 @@
         estado.vistaAtiva = 'login';
       },
       async login(email, senha) {
+        console.log("Tentando login para:", email);
         try {
           const result = await auth.signInWithEmailAndPassword(email, senha);
-          const uid = result.user.uid;
+          console.log("Login no Firebase Auth bem-sucedido. UID:", result.user.uid);
 
           // Busca dados extras do usuário no Firestore filtrando pelo e-mail
           const emailLogin = result.user.email.toLowerCase();
+          console.log("Buscando perfil no Firestore para e-mail:", emailLogin);
           const snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
 
           if (!snapshot.empty) {
             const doc = snapshot.docs[0];
             const dados = doc.data();
+            console.log("Perfil encontrado no Firestore:", dados);
             if (dados.ativo) {
               estado.usuarioAtual = { id: doc.id, ...dados };
               estado.vistaAtiva = estado.usuarioAtual.funcao;
               acoes.notificar(`Bem-vindo, ${estado.usuarioAtual.nome}!`, 'success');
             } else {
+              console.warn("Usuário encontrado mas está inativo.");
               await auth.signOut();
               acoes.notificar('Usuário inativo no sistema.', 'error');
             }
           } else {
+            console.error("Nenhum perfil encontrado no Firestore para o e-mail:", emailLogin);
             await auth.signOut();
-            acoes.notificar('Acesso autorizado no Firebase, mas perfil não encontrado no banco de dados.', 'error');
+            acoes.notificar('Perfil não encontrado no banco de dados. Contate o administrador.', 'error');
           }
         } catch (error) {
           console.error("Erro no login:", error);
