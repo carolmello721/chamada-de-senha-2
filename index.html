@@ -161,9 +161,16 @@
           }
         } catch (error) {
           console.error("Erro no login:", error);
-          let msg = "Erro ao entrar. Verifique sua conexão e credenciais.";
-          if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') msg = "E-mail ou senha incorretos.";
-          if (error.code === 'permission-denied') msg = "Acesso negado ao Banco de Dados. Verifique as Regras do Firestore.";
+          let msg = "Erro ao entrar. Tente novamente.";
+          if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            msg = "E-mail ou senha incorretos ou não cadastrados.";
+          }
+          if (error.code === 'auth/too-many-requests') {
+            msg = "Muitas tentativas. Tente novamente mais tarde.";
+          }
+          if (error.code === 'permission-denied') {
+            msg = "Acesso negado ao Banco de Dados. Verifique as Regras do Firestore.";
+          }
           acoes.notificar(msg, 'error');
         }
       },
@@ -381,7 +388,8 @@
           }
         } catch (error) {
           console.error("Erro durante o Seed de dados:", error);
-          acoes.notificar("Erro de conexão com o banco de dados. Verifique as Regras do Firestore.", "error");
+          // Silenciamos a notificação no load inicial para não confundir o usuário antes do login
+          console.warn("Aviso: Falha ao verificar dados iniciais (provavelmente regras do Firestore).");
         }
       }
     };
@@ -1388,7 +1396,7 @@
     };
 
     const app = createApp({
-      components: { TelaLogin, TelaRecepcao, TelaAtendimento, TelaGestor, AppLayout, TelaTV },
+      components: { TelaLogin, TelaRecepcao, TelaAtendimento, TelaGestor, TelaHistorico, AppLayout, TelaTV },
       setup() {
         const componenteAtual = computed(() => {
           if (estado.moduloAtual === 'tv') return TelaTV;
