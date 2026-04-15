@@ -116,36 +116,6 @@
       async login(email, senha) {
         console.log("Tentando login para:", email);
         try {
-          const result = await auth.signInWithEmailAndPassword(email, senha);
-          console.log("Login no Firebase Auth bem-sucedido. UID:", result.user.uid);
-
-          const emailLogin = result.user.email.toLowerCase();
-          console.log("Buscando perfil no Firestore para e-mail:", emailLogin);
-          let snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
-
-          // Se o perfil não existir e for o admin, criamos agora (auto-recuperação)
-          if (snapshot.empty && emailLogin === 'admin@cras.gov.br') {
-            console.log("Perfil admin não encontrado no Firestore. Criando agora...");
-            const novoAdmin = {
-              nome: 'Operador Admin',
-              email: 'admin@cras.gov.br',
-              senha: '123',
-              cpf: '000.000.000-00',
-              funcao: 'gerente',
-              polo: 'Central',
-              ativo: true,
-              assistenteSocial: false,
-              criadoEm: new Date().toISOString()
-            };
-            await db.collection("usuarios").add(novoAdmin);
-            snapshot = await db.collection("usuarios").where("email", "==", emailLogin).limit(1).get();
-          }
-
-          if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            const dados = doc.data();
-            console.log("Perfil encontrado no Firestore:", dados);
-            if (dados.ativo) {
               estado.usuarioAtual = { id: doc.id, ...dados };
               estado.vistaAtiva = estado.usuarioAtual.funcao;
               acoes.notificar(`Bem-vindo, ${estado.usuarioAtual.nome}!`, 'success');
@@ -156,8 +126,26 @@
             }
           } else {
             console.error("Nenhum perfil encontrado no Firestore para o e-mail:", emailLogin);
-            await auth.signOut();
-            acoes.notificar('Perfil não encontrado no Firestore. Verifique as regras do banco.', 'error');
+            // Se for o admin, podemos tentar criar o perfil básico
+            if (emailLogin === 'admin@cras.gov.br') {
+                console.log("Criando perfil admin básico no Firestore...");
+                const novoAdmin = {
+                    nome: 'Operador Admin',
+                    email: 'admin@cras.gov.br',
+                    cpf: '000.000.000-00',
+                    funcao: 'gerente',
+                    polo: 'Central',
+                    ativo: true,
+                    assistenteSocial: false,
+                    criadoEm: new Date().toISOString()
+                };
+                await db.collection("usuarios").add(novoAdmin);
+                acoes.notificar('Perfil admin criado com sucesso. Recarregue a página.', 'info');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                await auth.signOut();
+                acoes.notificar('Perfil não encontrado no Firestore. Verifique as regras do banco.', 'error');
+            }
           }
         } catch (error) {
           console.error("Erro no login:", error);
@@ -1435,10 +1423,9 @@
                   console.log("Sessão restaurada para:", user.email);
                 } else {
                   console.warn("Usuário autenticado no Auth mas sem perfil no Firestore:", user.email);
-                  // Se for o admin, tentamos criar o perfil na restauração também
                   if (emailLogin === 'admin@cras.gov.br') {
-                     console.log("Recuperando perfil admin durante restauração...");
-                     await acoes.login('admin@cras.gov.br', '123');
+                     // Não tentamos login novamente para evitar loops, apenas avisamos ou tentamos criar
+                     acoes.notificar('Perfil admin não encontrado no Banco de Dados.', 'warning');
                   }
                 }
               }
